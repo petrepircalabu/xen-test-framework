@@ -24,6 +24,14 @@
  * kept.
  */
 
+enum test_status {
+    STATUS_RUNNING, /**< Test not yet completed.       */
+    STATUS_SUCCESS, /**< Test was successful.          */
+    STATUS_SKIP,    /**< Test cannot be completed.     */
+    STATUS_ERROR,   /**< Issue with the test itself.   */
+    STATUS_FAILURE, /**< Issue with the tested matter. */
+};
+
 /**
  * Report test success.
  */

@@ -2,14 +2,6 @@
 #include <xtf/report.h>
 #include <xtf/hypercall.h>
 
-enum test_status {
-    STATUS_RUNNING, /**< Test not yet completed.       */
-    STATUS_SUCCESS, /**< Test was successful.          */
-    STATUS_SKIP,    /**< Test cannot be completed.     */
-    STATUS_ERROR,   /**< Issue with the test itself.   */
-    STATUS_FAILURE, /**< Issue with the tested matter. */
-};
-
 /** Current status of this test. */
 static enum test_status status;
 

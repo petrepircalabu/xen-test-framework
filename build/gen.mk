@@ -32,6 +32,9 @@ CLASS ?= "xtf.domu_test.DomuTestInfo"
 .PHONY: build
 build: $(foreach env,$(TEST-ENVS),test-$(env)-$(NAME)) $(TEST-CFGS)
 build: info.json
+ifeq (x$(CATEGORY),xmonitor)
+build: test-monitor-$(NAME)
+endif
 
 MKINFO-OPTS := -n "$(NAME)"
 MKINFO-OPTS += -c "$(CLASS)"
@@ -99,6 +102,15 @@ install-each-env: install-$(1) install-$(1).cfg
 
 endef
 $(foreach env,$(TEST-ENVS),$(eval $(call PERENV_build,$(env))))
+
+define MONITOR_build
+test-monitor-$(NAME): $(DEPS-MONITOR)
+	@echo $(obj-monitor)
+	@echo $(DEPS-MONITOR)
+	$(HOSTCC) $(HOSTLDFLAGS) $(DEPS-MONITOR) $(HOSTLDLIBS) -o $$@
+endef
+
+$(eval $(call MONITOR_build))
 
 .PHONY: clean
 clean:

@@ -1,4 +1,4 @@
-ALL_CATEGORIES     := special functional xsa utility in-development
+ALL_CATEGORIES     := special functional xsa utility in-development monitor
 
 ALL_ENVIRONMENTS   := pv64 pv32pae hvm64 hvm32pae hvm32pse hvm32
 
@@ -35,11 +35,20 @@ COMMON_AFLAGS-x86_64 := -m64
 COMMON_CFLAGS-x86_32 := -m32
 COMMON_CFLAGS-x86_64 := -m64
 
+#HOSTCFLAGS := -Wall -Werror
+HOSTCFLAGS  :=
+HOSTLDFLAGS :=
+HOSTLDLIBS  :=
+HOSTCFLAGS  += -D__XEN_TOOLS__ -g -O3 -I$(ROOT)/include/monitor
+HOSTCFLAGS  += -DXC_WANT_COMPAT_DEVICEMODEL_API -DXC_WANT_COMPAT_MAP_FOREIGN_API
+HOSTLDLIBS  += -lxenctrl -lxenstore -lxenevtchn
+
 defcfg-pv    := $(ROOT)/config/default-pv.cfg.in
 defcfg-hvm   := $(ROOT)/config/default-hvm.cfg.in
 
 obj-perarch :=
 obj-perenv  :=
+obj-monitor :=
 include $(ROOT)/build/files.mk
 
 
@@ -90,7 +99,18 @@ DEPS-$(1) = $$(head-$(1)) \
 
 endef
 
+# Setup monitor rules
+define MONITOR_setup
+DEPS-MONITOR = \
+	$$(obj-monitor:%.o=%-monitor.o)
+
+%-monitor.o: %.c
+	$$(HOSTCC) $$(HOSTCFLAGS) -c $$< -o $$@
+endef
+
 $(foreach env,$(ALL_ENVIRONMENTS),$(eval $(call PERENV_setup,$(env))))
+
+$(eval $(call MONITOR_setup))
 
 define move-if-changed
 	if ! cmp -s $(1) $(2); then mv -f $(1) $(2); else rm -f $(1); fi

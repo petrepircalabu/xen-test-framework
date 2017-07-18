@@ -145,4 +145,7 @@ enable BTS.
 @subpage test-nested-svm - Nested SVM tests.
 
 @subpage test-nested-vmx - Nested VT-x tests.
+
+
+@section index-monitor Monitor
 */
