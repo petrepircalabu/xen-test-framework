@@ -32,14 +32,20 @@ INSTALL_PROGRAM := $(INSTALL) -p
 OBJCOPY         := $(CROSS_COMPILE)objcopy
 PYTHON          := python
 
-export CC CPP INSTALL INSTALL_DATA INSTALL_DIR INSTALL_PROGRAM OBJCOPY PYTHON
+HOSTCC          := gcc
+
+export CC CPP INSTALL INSTALL_DATA INSTALL_DIR INSTALL_PROGRAM OBJCOPY PYTHON HOSTCC
 
 .PHONY: all
-all:
+all: host
 	@set -e; for D in $(wildcard tests/*); do \
 		[ ! -e $$D/Makefile ] && continue; \
 		$(MAKE) -C $$D build; \
 	done
+
+.PHONY: host
+host: 
+	$(MAKE) -C monitor
 
 .PHONY: install
 install:

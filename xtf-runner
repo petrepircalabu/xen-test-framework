@@ -445,6 +445,8 @@ def interpret_result(logline):
 
     return "CRASH"
 
+def start_monitor():
+    print "Starting Monitor"
 
 def run_test_console(opts, test):
     """ Run a specific, obtaining results via xenconsole """
@@ -467,6 +469,9 @@ def run_test_console(opts, test):
         print "Executing '%s'" % (" ".join(cmd), )
 
     console = Popen(cmd, stdout = PIPE)
+
+    if opts.monitor:
+        start_monitor()
 
     cmd = ['xl', 'unpause', test.vm_name()]
     if not opts.quiet:
@@ -707,6 +712,11 @@ def main():
     parser.add_option("-q", "--quiet", action = "store_true",
                       dest = "quiet",
                       help = "Print only test results, without console output",
+                      )
+
+    parser.add_option("-n", "--monitor", action = "store_true",
+                      dest = "monitor",
+                      help = "start monitor stub"
                       )
 
     opts, args = parser.parse_args()
