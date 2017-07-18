@@ -140,4 +140,9 @@ guest.
 @subpage test-nested-svm - Nested SVM tests.
 
 @subpage test-nested-vmx - Nested VT-x tests.
+
+
+@section index-monitor Monitor
+
+@subpage test-emul_unimplemented - @Test EMUL_UNIMPLEMENTED event generation
 */

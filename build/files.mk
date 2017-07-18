@@ -55,3 +55,6 @@ $(foreach env,$(32BIT_ENVIRONMENTS),$(eval obj-$(env) += $(obj-32)))
 # 64bit specific objects
 obj-64  += $(ROOT)/arch/x86/entry_64.o
 $(foreach env,$(64BIT_ENVIRONMENTS),$(eval obj-$(env) += $(obj-64)))
+
+# Monitor common objects
+obj-monitor += $(ROOT)/monitor/monitor.o
