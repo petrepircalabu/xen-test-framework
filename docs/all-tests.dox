@@ -115,4 +115,9 @@ guest breakout.
 @section index-in-development In Development
 
 @subpage test-vvmx - Nested VT-x tests.
+
+
+@section index-monitor Monitor
+
+@subpage test-emul_unimplemented - @Test EMUL_UNIMPLEMENTED event generation
 */
