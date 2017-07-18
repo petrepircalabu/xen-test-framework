@@ -32,7 +32,9 @@ INSTALL_PROGRAM := $(INSTALL) -p
 OBJCOPY         := $(CROSS_COMPILE)objcopy
 PYTHON          := python
 
-export CC CPP INSTALL INSTALL_DATA INSTALL_DIR INSTALL_PROGRAM OBJCOPY PYTHON
+HOSTCC          := gcc
+
+export CC CPP INSTALL INSTALL_DATA INSTALL_DIR INSTALL_PROGRAM OBJCOPY PYTHON HOSTCC
 
 .PHONY: all
 all:
@@ -51,7 +53,7 @@ install:
 	done
 
 define all_sources
-	find include/ arch/ common/ tests/ -name "*.[hcsS]"
+	find include/ arch/ common/ tests/ monitor/ -name "*.[hcsS]"
 endef
 
 .PHONY: cscope

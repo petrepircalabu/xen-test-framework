@@ -37,7 +37,7 @@ def exit_code(state):
 
 # All test categories
 default_categories     = set(("functional", "xsa"))
-non_default_categories = set(("special", "utility", "in-development"))
+non_default_categories = set(("special", "utility", "in-development", "monitor"))
 all_categories         = default_categories | non_default_categories
 
 # All test environments
@@ -67,9 +67,21 @@ class TestInstance(object):
         """ Return the VM name as `xl` expects it. """
         return repr(self)
 
+    def vm_path(self):
+        """ Return the VM path. """
+        return path.join("tests", self.name, repr(self))
+
     def cfg_path(self):
         """ Return the path to the `xl` config file for this test. """
         return path.join("tests", self.name, repr(self) + ".cfg")
+
+    def monitor_path(self):
+        """ Return the path to the test's monitor app if applicable """
+        if get_all_test_info()[self.name].cat == 'monitor':
+            return path.join("tests", self.name, "test-monitor-" + self.name)
+        else:
+            raise RunnerError("Test '%s' is not a monitor test"
+                              % (self.name, ))
 
     def __repr__(self):
         if not self.variation:
@@ -445,9 +457,18 @@ def interpret_result(logline):
 
     return "CRASH"
 
+def start_monitor(test):
+    print "Starting Monitor ... "
+    cmd = [test.monitor_path() + " --address=0x$(nm --defined-only " +
+            test.vm_path() + " | grep test_fn | awk '{print $1}') " +
+            "$(xl domid " + test.vm_name() + ")"]
+    return Popen(cmd, shell=True)
+
 
 def run_test_console(opts, test):
     """ Run a specific, obtaining results via xenconsole """
+
+#    print test
 
     cmd = ['xl', 'create', '-p', test.cfg_path()]
     if not opts.quiet:
@@ -468,20 +489,27 @@ def run_test_console(opts, test):
 
     console = Popen(cmd, stdout = PIPE)
 
-    cmd = ['xl', 'unpause', test.vm_name()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    rc = subproc_call(cmd)
-    if rc:
-        if opts.quiet:
+    if get_all_test_info()[test.name].cat == 'monitor':
+        monitor = start_monitor(test)
+    else:
+        cmd = ['xl', 'unpause', test.vm_name()]
+        if not opts.quiet:
             print "Executing '%s'" % (" ".join(cmd), )
-        raise RunnerError("Failed to unpause VM")
+
+        rc = subproc_call(cmd)
+        if rc:
+            if opts.quiet:
+                print "Executing '%s'" % (" ".join(cmd), )
+            raise RunnerError("Failed to unpause VM")
 
     stdout, _ = console.communicate()
 
     if console.returncode:
         raise RunnerError("Failed to obtain VM console")
+
+    if get_all_test_info()[test.name].cat == 'monitor':
+        if monitor.returncode:
+            raise RunnerError("Failed to start monitor application");
 
     lines = stdout.splitlines()
 

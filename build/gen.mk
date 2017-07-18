@@ -30,6 +30,9 @@ endif
 .PHONY: build
 build: $(foreach env,$(TEST-ENVS),test-$(env)-$(NAME)) $(TEST-CFGS)
 build: info.json
+ifeq (x$(CATEGORY),xmonitor)
+build: test-monitor-$(NAME)
+endif
 
 info.json: $(ROOT)/build/mkinfo.py FORCE
 	@$(PYTHON) $< $@.tmp "$(NAME)" "$(CATEGORY)" "$(TEST-ENVS)" "$(VARY-CFG)"
@@ -92,6 +95,15 @@ install-each-env: install-$(1) install-$(1).cfg
 
 endef
 $(foreach env,$(TEST-ENVS),$(eval $(call PERENV_build,$(env))))
+
+define MONITOR_build
+test-monitor-$(NAME): $(DEPS-MONITOR)
+	@echo $(obj-monitor)
+	@echo $(DEPS-MONITOR)
+	$(HOSTCC) $(HOSTLDFLAGS) $(DEPS-MONITOR) $(HOSTLDLIBS) -o $$@
+endef
+
+$(eval $(call MONITOR_build))
 
 .PHONY: clean
 clean:
