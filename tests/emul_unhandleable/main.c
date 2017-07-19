@@ -14,6 +14,7 @@ const char test_title[] = "Test emul_unhandleable";
 
 void test_main(void)
 {
+    while(1);
     xtf_success(NULL);
 }
 
