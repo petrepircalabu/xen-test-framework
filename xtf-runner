@@ -445,11 +445,31 @@ def interpret_result(logline):
 
     return "CRASH"
 
-def start_monitor():
-    print "Starting Monitor"
+def get_test_domid(test):
+    """ Return the test's domid  """
+
+    cmd = ['xl', 'domid', test.vm_name()]
+
+    domid = Popen(cmd, stdout = PIPE, stderr = PIPE)
+
+    out, err = domid.communicate()
+
+    if domid.returncode:
+        raise RunnerError("Domain " + test + " not created")
+
+    return int(out)
+
+def start_monitor(test):
+    print "Starting Monitor ... "
+    domid = get_test_domid(test)
+    cmd = ['./monitor/monitor', str(domid)]
+    return Popen(cmd)
+
 
 def run_test_console(opts, test):
     """ Run a specific, obtaining results via xenconsole """
+
+#    print test
 
     cmd = ['xl', 'create', '-p', test.cfg_path()]
     if not opts.quiet:
@@ -471,7 +491,7 @@ def run_test_console(opts, test):
     console = Popen(cmd, stdout = PIPE)
 
     if opts.monitor:
-        start_monitor()
+        monitor = start_monitor(test)
 
     cmd = ['xl', 'unpause', test.vm_name()]
     if not opts.quiet:
@@ -487,6 +507,10 @@ def run_test_console(opts, test):
 
     if console.returncode:
         raise RunnerError("Failed to obtain VM console")
+
+    if opts.monitor:
+        if monitor.returncode:
+            raise RunnerError("Failed to start monitor application");
 
     lines = stdout.splitlines()
 

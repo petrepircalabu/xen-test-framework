@@ -14,7 +14,7 @@ HOSTCFLAGS += -DXC_WANT_COMPAT_DEVICEMODEL_API
 	$(HOSTCC) -c $(HOSTCFLAGS) $(HOSTCPPFLAGS) $< -o $@
 
 monitor: $(OBJS)
-	$(HOSTCC) -o $@ $^ -lxenctrl
+	$(HOSTCC) -o $@ $^ -lxenctrl -lxenstore -lxenevtchn
 
 clean:
 	$(RM) $(OBJS) monitor

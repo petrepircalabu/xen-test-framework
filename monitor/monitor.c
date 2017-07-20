@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+
 #include <xenctrl.h>
 #include <xenevtchn.h>
+#include <xen/vm_event.h>
 
 typedef struct xen_monitor_test
 {
@@ -15,10 +17,20 @@ typedef struct xen_monitor_test
 
     uint32_t evtchn_port;
 
+    xenevtchn_handle *xce_handle;
+
+    int port;
+
+    vm_event_back_ring_t back_ring;
+
+    xen_pfn_t max_gpfn;
+
 } xen_monitor_test_t;
 
 static int monitor_init(xen_monitor_test_t *test, domid_t domain_id)
 {
+    int rc;
+
     test->xch = xc_interface_open(NULL, NULL, 0);
     if ( !test->xch )
     {
@@ -36,6 +48,27 @@ static int monitor_init(xen_monitor_test_t *test, domid_t domain_id)
         return -1;
     }
 
+    test->xce_handle = xenevtchn_open(NULL, 0);
+    if ( !test->xce_handle )
+    {
+        printf("Failed to open XEN event channel\n");
+        return -1;
+    }
+
+    rc = xenevtchn_bind_interdomain(test->xce_handle,
+            test->domain_id, test->evtchn_port);
+    if ( rc < 0 )
+    {
+        printf("Failed to bind XEN event channel\n");
+        return -1;
+    }
+    test->port = rc;
+
+    /* Initialise ring */
+    SHARED_RING_INIT((vm_event_sring_t *)test->ring_page);
+    BACK_RING_INIT(&test->back_ring,
+                   (vm_event_sring_t *)test->ring_page,
+                   XC_PAGE_SIZE);
     return 0;
 }
 
@@ -45,6 +78,27 @@ static int monitor_cleanup(xen_monitor_test_t *test)
 
     if ( test->ring_page )
         munmap(test->ring_page, XC_PAGE_SIZE);
+
+    rc = xc_monitor_disable(test->xch, test->domain_id);
+    if ( rc != 0 )
+    {
+        printf("Error disabling monitor\n");
+        return rc;
+    }
+
+    rc = xenevtchn_unbind(test->xce_handle, test->port);
+    if ( rc != 0 )
+    {
+        printf("Failed to unbind XEN event channel\n");
+        return rc;
+    }
+
+    rc = xenevtchn_close(test->xce_handle);
+    if ( rc != 0 )
+    {
+        printf("Failed to close XEN event channel\n");
+        return rc;
+    }
     
     if ( test->xch )
     {
@@ -61,8 +115,8 @@ static int monitor_cleanup(xen_monitor_test_t *test)
 
 int main(int argc, char* argv[])
 {
-
     domid_t domain_id;
+    int rc;
 
     xen_monitor_test_t *test = calloc(1, sizeof(xen_monitor_test_t));
     if (!test)
@@ -76,6 +130,17 @@ int main(int argc, char* argv[])
 
     monitor_init(test, domain_id);
 
+    /* Get max_gpfn */
+    rc = xc_domain_maximum_gpfn(test->xch,
+                                test->domain_id,
+                                &test->max_gpfn);
+
+    if ( rc )
+    {
+        printf("Failed to get max gpfn");
+    }
+
+    printf("max_gpfn = %"PRI_xen_pfn"\n", test->max_gpfn);
 cleanup:
     monitor_cleanup(test);
 
