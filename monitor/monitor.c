@@ -113,6 +113,11 @@ static int monitor_cleanup(xen_monitor_test_t *test)
     return 0;
 }
 
+int monitor_test()
+{
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
     domid_t domain_id;
@@ -134,13 +139,19 @@ int main(int argc, char* argv[])
     rc = xc_domain_maximum_gpfn(test->xch,
                                 test->domain_id,
                                 &test->max_gpfn);
-
     if ( rc )
     {
         printf("Failed to get max gpfn");
     }
 
     printf("max_gpfn = %"PRI_xen_pfn"\n", test->max_gpfn);
+
+    rc = monitor_test();
+    if ( rc )
+    {
+        printf("");
+    }
+
 cleanup:
     monitor_cleanup(test);
 
