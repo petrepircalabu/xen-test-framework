@@ -493,15 +493,15 @@ def run_test_console(opts, test):
     if opts.monitor:
         monitor = start_monitor(test)
 
-    cmd = ['xl', 'unpause', test.vm_name()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
+#    cmd = ['xl', 'unpause', test.vm_name()]
+#    if not opts.quiet:
+#        print "Executing '%s'" % (" ".join(cmd), )
 
-    rc = subproc_call(cmd)
-    if rc:
-        if opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-        raise RunnerError("Failed to unpause VM")
+#    rc = subproc_call(cmd)
+#    if rc:
+#        if opts.quiet:
+#            print "Executing '%s'" % (" ".join(cmd), )
+#        raise RunnerError("Failed to unpause VM")
 
     stdout, _ = console.communicate()
 

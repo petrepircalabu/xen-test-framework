@@ -12,10 +12,26 @@
 
 const char test_title[] = "Test emul_unhandleable";
 
+static int count;
+
+static int __attribute__((section(".text.secondary"))) __attribute__ ((noinline)) test_fn(void)
+{
+    count++;
+    return 0;
+}
+
 void test_main(void)
 {
-    while(1);
-    xtf_success(NULL);
+    count = 0;
+    count++;
+    if ( test_fn() || count != 2 )
+    {
+        xtf_error(NULL);
+    }
+    else
+    {
+        xtf_success(NULL);
+    }
 }
 
 /*

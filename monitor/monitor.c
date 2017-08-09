@@ -115,13 +115,15 @@ static int monitor_cleanup(xen_monitor_test_t *test)
 
 int monitor_test()
 {
+    printf ("Running monitor test...\n");
     return 0;
 }
 
 int main(int argc, char* argv[])
 {
     domid_t domain_id;
-    int rc;
+    int rc, i;
+    xenmem_access_t tmp, page;
 
     xen_monitor_test_t *test = calloc(1, sizeof(xen_monitor_test_t));
     if (!test)
@@ -142,14 +144,50 @@ int main(int argc, char* argv[])
     if ( rc )
     {
         printf("Failed to get max gpfn");
+        goto cleanup;
     }
 
     printf("max_gpfn = %"PRI_xen_pfn"\n", test->max_gpfn);
 
+
+    /* Set whether the access listener is required */
+    rc = xc_domain_set_access_required(test->xch, test->domain_id, 0);
+    if ( rc < 0 )
+    {
+        printf("Error %d setting mem_access listener required\n", rc);
+        goto cleanup;
+    }
+
+    for ( i = 0; i < test->max_gpfn; i++ )
+    {
+        if ( xc_get_mem_access(test->xch, test->domain_id,
+                    i, &page) != 0 )
+        {
+   //         printf("Error getting mem access for page %d.\n", i);
+   //         goto cleanup;
+            continue;
+        }
+
+        printf ("Page %d is %d.\n", i, page);
+
+        if ( page == XENMEM_access_rx )
+        {
+            printf("Page %d is executable.\n", i);
+        }
+    }
+    
+    /* Unpause the domain and start test */
+    rc = xc_domain_unpause(test->xch, test->domain_id);
+    if ( rc < 0 )
+    {
+        printf("Error unpausing domain.");
+        goto cleanup;
+    }
+
     rc = monitor_test();
     if ( rc )
     {
-        printf("");
+        printf("  Failed to run test");
     }
 
 cleanup:
