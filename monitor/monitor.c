@@ -29,6 +29,8 @@ typedef struct xen_monitor_test
 
     uint16_t altp2m_view_id;
 
+    void *map;
+
 } xen_monitor_test_t;
 
 static int monitor_init(xen_monitor_test_t *test, domid_t domain_id)
@@ -232,25 +234,20 @@ int monitor_test(xen_monitor_test_t *test)
             switch (req.reason) 
             {
             case VM_EVENT_REASON_MEM_ACCESS:
-                printf("mem_access rip = %016x gfn = %lx offset = %lx gla =%lx\n",
+                printf("mem_access rip = %016lx gfn = %lx offset = %lx gla =%lx\n",
                    req.data.regs.x86.rip,
                    req.u.mem_access.gfn,
                    req.u.mem_access.offset,
                    req.u.mem_access.gla);
-                //if ( req.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
-                {
-                    printf("\tSwitching back to default view!\n");
 
-                    //rsp.flags |= VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
-                    rsp.flags |= VM_EVENT_FLAG_EMULATE;
-                    //rsp.altp2m_idx = 0;
-                    {
-                        volatile unsigned long *p = (volatile unsigned long *)req.data.regs.x86.rip;
-                        instr = *p;
-                        *p = 0xDEADBABE;
-                    }
+                rsp.flags |= VM_EVENT_FLAG_EMULATE;
+
+                {
+                    volatile unsigned long *p = (volatile unsigned long *)test->map;
+                    instr = *p;
+                    *p = 0xDEADBABE;
                 }
-                //rsp.u.mem_access = req.u.mem_access;
+                rsp.u.mem_access = req.u.mem_access;
                 break;
             case VM_EVENT_REASON_SINGLESTEP:
                 printf("Singlestep: rip=%016lx, vcpu %d, altp2m %u\n",
@@ -274,7 +271,7 @@ int monitor_test(xen_monitor_test_t *test)
                        req.vcpu_id);
 
                 {
-                    volatile unsigned long *p = (volatile unsigned long *)req.data.regs.x86.rip;
+                    volatile unsigned long *p = (volatile unsigned long *)test->map;
                     *p = instr;
                 }
                 rsp.flags |= (VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP);
@@ -332,33 +329,23 @@ int main(int argc, char* argv[])
 
 
     /* Set whether the access listener is required */
-    rc = xc_domain_set_access_required(test->xch, test->domain_id, 0);
+    rc = xc_domain_set_access_required(test->xch, test->domain_id, 1);
     if ( rc < 0 )
     {
         printf("Error %d setting mem_access listener required\n", rc);
         goto cleanup;
     }
 
-    /*
-    for ( i = 0; i < test->max_gpfn; i++ )
+
+    rc = xc_monitor_emul_unimplemented(test->xch, test->domain_id, 1);
+    if ( rc < 0 )
     {
-        if ( xc_get_mem_access(test->xch, test->domain_id,
-                    i, &page) != 0 )
-        {
-   //         printf("Error getting mem access for page %d.\n", i);
-   //         goto cleanup;
-            continue;
-        }
-
-        printf ("Page %d is %d.\n", i, page);
-
-        if ( page == XENMEM_access_rx )
-        {
-            printf("Page %d is executable.\n", i);
-        }
+        printf("Error %d emulation unimplemented with vm_event\n", rc);
+        goto cleanup;
     }
-    */
+
     unsigned long perm_set = 0;
+
 
     rc = xc_altp2m_set_domain_state( test->xch, test->domain_id, 1 );
     if ( rc < 0 )
@@ -377,6 +364,8 @@ int main(int argc, char* argv[])
     printf("altp2m view created with id %u\n", test->altp2m_view_id);
     printf("Setting altp2m mem_access permissions.. ");
 
+
+
 //    for(i=0; i < test->max_gpfn; ++i)
     {
         rc = xc_altp2m_set_mem_access( test->xch, test->domain_id, test->altp2m_view_id, 
@@ -387,6 +376,21 @@ int main(int argc, char* argv[])
     }
 
     printf("done! Permissions set on %lu pages.\n", perm_set);
+
+    unsigned long gfn = xc_translate_foreign_address(test->xch, test->domain_id, 0, 0x105000);
+    printf ("translate foreign 0x105000 -> %lx\n", gfn);
+
+    test->map = 0;
+
+    test->map = xc_map_foreign_range(test->xch, test->domain_id, 4096, PROT_READ | PROT_WRITE , 0);
+    printf ("map = %p\n", test->map);
+
+    if (!test->map)
+    {
+        printf("Failed to map page.\n");
+        goto cleanup;
+    }
+
 
     rc = xc_altp2m_switch_to_view( test->xch, test->domain_id, test->altp2m_view_id );
     if ( rc < 0 )
@@ -401,6 +405,7 @@ int main(int argc, char* argv[])
         printf("Error %d failed to enable singlestep monitoring!\n", rc);
         goto cleanup;
     }
+
     /* Unpause the domain and start test */
     rc = xc_domain_unpause(test->xch, test->domain_id);
     if ( rc < 0 )
@@ -412,7 +417,7 @@ int main(int argc, char* argv[])
     rc = monitor_test(test);
     if ( rc )
     {
-        printf("  Failed to run test");
+        printf("Failed to run test\n");
     }
 
 cleanup:
@@ -420,6 +425,12 @@ cleanup:
     rc = xc_altp2m_destroy_view(test->xch, test->domain_id, test->altp2m_view_id);
     rc = xc_altp2m_set_domain_state(test->xch, test->domain_id, 0);
     rc = xc_monitor_singlestep(test->xch, test->domain_id, 0);
+
+    if (test->map)
+    {
+        munmap(test->map, 4096);
+    }
+
     monitor_cleanup(test);
 
     free(test);
