@@ -37,15 +37,11 @@ HOSTCC          := gcc
 export CC CPP INSTALL INSTALL_DATA INSTALL_DIR INSTALL_PROGRAM OBJCOPY PYTHON HOSTCC
 
 .PHONY: all
-all: host
+all:
 	@set -e; for D in $(wildcard tests/*); do \
 		[ ! -e $$D/Makefile ] && continue; \
 		$(MAKE) -C $$D build; \
 	done
-
-.PHONY: host
-host: 
-	$(MAKE) -C monitor
 
 .PHONY: install
 install:
@@ -57,7 +53,7 @@ install:
 	done
 
 define all_sources
-	find include/ arch/ common/ tests/ -name "*.[hcsS]"
+	find include/ arch/ common/ tests/ monitor/ -name "*.[hcsS]"
 endef
 
 .PHONY: cscope

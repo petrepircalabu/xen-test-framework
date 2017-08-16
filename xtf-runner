@@ -37,7 +37,7 @@ def exit_code(state):
 
 # All test categories
 default_categories     = set(("functional", "xsa"))
-non_default_categories = set(("special", "utility", "in-development"))
+non_default_categories = set(("special", "utility", "in-development", "monitor"))
 all_categories         = default_categories | non_default_categories
 
 # All test environments
@@ -70,6 +70,14 @@ class TestInstance(object):
     def cfg_path(self):
         """ Return the path to the `xl` config file for this test. """
         return path.join("tests", self.name, repr(self) + ".cfg")
+
+    def monitor_path(self):
+        """ Return the path to the test's monitor app if applicable """
+        if get_all_test_info()[self.name].cat == 'monitor':
+            return path.join("tests", self.name, "monitor-" + self.name)
+        else:
+            raise RunnerError("Test '%s' is not a monitor test"
+                              % (self.name, ))
 
     def __repr__(self):
         if not self.variation:
@@ -462,7 +470,7 @@ def get_test_domid(test):
 def start_monitor(test):
     print "Starting Monitor ... "
     domid = get_test_domid(test)
-    cmd = ['./monitor/monitor', str(domid)]
+    cmd = [test.monitor_path(), str(domid)]
     return Popen(cmd)
 
 
