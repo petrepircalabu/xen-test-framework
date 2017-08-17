@@ -74,7 +74,7 @@ class TestInstance(object):
     def monitor_path(self):
         """ Return the path to the test's monitor app if applicable """
         if get_all_test_info()[self.name].cat == 'monitor':
-            return path.join("tests", self.name, "monitor-" + self.name)
+            return path.join("tests", self.name, "test-monitor-" + self.name)
         else:
             raise RunnerError("Test '%s' is not a monitor test"
                               % (self.name, ))

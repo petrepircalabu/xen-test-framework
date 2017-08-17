@@ -31,7 +31,7 @@ endif
 build: $(foreach env,$(TEST-ENVS),test-$(env)-$(NAME)) $(TEST-CFGS)
 build: info.json
 ifeq (x$(CATEGORY),xmonitor)
-build: monitor-$(NAME)
+build: test-monitor-$(NAME)
 endif
 
 info.json: $(ROOT)/build/mkinfo.py FORCE
@@ -93,7 +93,7 @@ endef
 $(foreach env,$(TEST-ENVS),$(eval $(call PERENV_build,$(env))))
 
 define MONITOR_build
-monitor-$(NAME): $(DEPS-MONITOR)
+test-monitor-$(NAME): $(DEPS-MONITOR)
 	@echo $(obj-monitor)
 	@echo $(DEPS-MONITOR)
 	$(HOSTCC) $(HOSTLDFLAGS) $(DEPS-MONITOR) $(HOSTLDLIBS) -o $$@
