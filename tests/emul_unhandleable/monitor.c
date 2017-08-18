@@ -8,26 +8,25 @@
 #include <monitor.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 
 typedef struct emul_unhandleable_test
 {
-    xtf_vm_event_t vm_event;
-    xc_interface *xch;
     uint64_t address;
+    uint16_t altp2m_view_id;
+    void *map;
 } emul_unhandleable_test_t;
-
-static emul_unhandleable_test_t test_data;
 
 const char monitor_test_help[] = \
     "Usage: test-monitor-emul_unhandleable [options] <domid>\n"
     "\t -a <address>: the address where an invalid instruction will be injected\n"
     ;
 
-static int parse_options(void *pdata, int argc, char *argv[])
+static int emul_unhandleable_setup(xtf_monitor_t *pdata, int argc, char *argv[])
 {
     int ret, c;
     static struct option long_options[] = {
-        MONITOR_COMMON_OPTIONS_LONG,
+        XTF_MONITOR_COMMON_OPTIONS_LONG,
         {"address", no_argument,    0,  'a'},
         {0, 0, 0, 0}
     };
@@ -45,13 +44,13 @@ static int parse_options(void *pdata, int argc, char *argv[])
     while (1)
     {
         int option_index = 0;
-        c = getopt_long(argc, argv, MONITOR_COMMON_OPTIONS_SHORT "a:",
+        c = getopt_long(argc, argv, XTF_MONITOR_COMMON_OPTIONS_SHORT "a:",
                 long_options, &option_index);
         if ( c == -1 ) break;
 
         switch ( c )
         {
-            MONITOR_COMMON_OPTIONS_HANDLER;
+            XTF_MONITOR_COMMON_OPTIONS_HANDLER;
             case 'a':
                 priv->address = atol(optarg);
                 break;
@@ -62,65 +61,137 @@ static int parse_options(void *pdata, int argc, char *argv[])
 
         if ( !priv->address )
         {
-            fprintf(stderr, "%s: Please specify a valid instruction injection address\n");
+            fprintf(stderr, "%s: Please specify a valid instruction injection address\n", argv[0]);
             return -EINVAL;
         }
 
         if ( optind != argc - 1 )
         {
-            fprintf(stderr, "%s: Please specify the domain id\n");
+            fprintf(stderr, "%s: Please specify the domain id\n", argv[0]);
             return -EINVAL;
         }
     }
 
-    priv->vm_event.domain_id = atoi(argv[optind]);
+    pdata->evt.domain_id = atoi(argv[optind]);
+    /* assert(pdata->evt.domain_id) */
 
     return 0;
 }
 
-static int emul_unhandleable_init(emul_unhandleable_test_t *priv)
+static int emul_unhandleable_init(xtf_monitor_t *pmon)
 {
-    return 0;
-}
+    int rc = 0;
+    unsigned long gfn = 0x105;
+    emul_unhandleable_test_t *pdata = (emul_unhandleable_test_t *)pmon->pdata;
 
-static int emul_unhandleable_cleanup(emul_unhandleable_test_t *priv)
-{
-    return 0;
-}
+    /* assert(pmon) */
+    /* assert(pmon->pdata) */
 
-int main(int argc, char* argv[])
-{
-    int rc;
-    rc = parse_options((void *)&test_data, argc, argv);
-    if ( rc )
-        return rc;
-
-    test_data.xch = xc_interface_open(NULL, NULL, 0);
-    if ( !test_data.xch )
+    rc = xc_domain_set_access_required(pmon->xch, pmon->evt.domain_id, 1);
+    if ( rc < 0 )
     {
-        fprintf(stderr, "Error initialising xenaccess\n");
+        fprintf(stderr, "Error %d setting mem_access listener required\n", rc);
+        return rc;
+    }
+
+
+    rc = xc_monitor_emul_unimplemented(pmon->xch, pmon->evt.domain_id, 1);
+    if ( rc < 0 )
+    {
+        fprintf(stderr, "Error %d emulation unimplemented with vm_event\n", rc);
+        return rc;
+    }
+
+
+    rc = xc_altp2m_set_domain_state(pmon->xch, pmon->evt.domain_id, 1);
+    if ( rc < 0 )
+    {
+        fprintf(stderr, "Error %d enabling altp2m on domain!\n", rc);
+        return rc;
+    }
+
+    rc = xc_altp2m_create_view(pmon->xch, pmon->evt.domain_id,
+            XENMEM_access_rwx, &pdata->altp2m_view_id );
+    if ( rc < 0 )
+    {
+        fprintf(stderr, "Error %d creating altp2m view!\n", rc);
+        return rc;
+    }
+
+    rc = xc_altp2m_set_mem_access(pmon->xch, pmon->evt.domain_id,
+            pdata->altp2m_view_id, 0x105, XENMEM_access_rw);
+    if ( rc < 0 )
+    {
+        fprintf(stderr, "Error %d setting altp2m memory access!\n", rc);
+        return rc;
+    }
+
+
+    gfn = xc_translate_foreign_address(pmon->xch, pmon->evt.domain_id, 0, 0x105000);
+
+    pdata->map = xc_map_foreign_range(pmon->xch, pmon->evt.domain_id, 4096,
+            PROT_READ | PROT_WRITE , 0);
+    if ( !pdata->map )
+    {
+        fprintf(stderr, "Failed to map page.\n");
         return -1;
     }
 
-    rc = monitor_init(test_data.xch, &test_data.vm_event, test_data.vm_event.domain_id);
-    if ( rc )
-        goto e_exit;
-
-    rc = emul_unhandleable_init(&test_data);
-    if ( rc )
-        goto e_exit;
-
-e_exit:
-    emul_unhandleable_cleanup(&test_data);
-
-    monitor_cleanup(test_data.xch, &test_data.vm_event);
-
-    if ( test_data.xch )
+    rc = xc_altp2m_switch_to_view(pmon->xch, pmon->evt.domain_id, pdata->altp2m_view_id );
+    if ( rc < 0 )
     {
-        xc_interface_close(test_data.xch);
+        fprintf(stderr, "Error %d switching to altp2m view!\n", rc);
+        return rc;
     }
-    return rc;
+
+    rc = xc_monitor_singlestep(pmon->xch, pmon->evt.domain_id, 1 );
+    if ( rc < 0 )
+    {
+        fprintf(stderr, "Error %d failed to enable singlestep monitoring!\n", rc);
+        return rc;
+    }
+
+    return 0;
 }
+
+static int emul_unhandleable_cleanup(xtf_monitor_t *pmon)
+{
+
+    /* assert(pmon) */
+    /* assert(pmon->pdata) */
+
+    emul_unhandleable_test_t *pdata = (emul_unhandleable_test_t *)pmon->pdata;
+
+    xc_altp2m_switch_to_view(pmon->xch, pmon->evt.domain_id, 0 );
+
+    xc_altp2m_destroy_view(pmon->xch, pmon->evt.domain_id, pdata->altp2m_view_id);
+
+    xc_altp2m_set_domain_state(pmon->xch, pmon->evt.domain_id, 0);
+
+    xc_monitor_singlestep(pmon->xch, pmon->evt.domain_id, 0);
+
+    if (pdata->map)
+    {
+        munmap(pdata->map, 4096);
+    }
+
+    return 0;
+}
+
+static emul_unhandleable_test_t test_data;
+
+static xtf_monitor_ops_t emul_unhandleable_ops = { };
+
+static xtf_monitor_t monitor_instance =
+{
+    .pdata      = (void *)&test_data,
+    .setup      = emul_unhandleable_setup,
+    .init       = emul_unhandleable_init,
+    .cleanup    = emul_unhandleable_cleanup,
+    .evt.ops    = &emul_unhandleable_ops,
+};
+
+xtf_monitor_t *pmon = &monitor_instance;
 
 /*
  * Local variables:
