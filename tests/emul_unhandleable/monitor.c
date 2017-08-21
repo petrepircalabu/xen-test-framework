@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 typedef struct emul_unhandleable_monitor
 {
@@ -17,6 +18,7 @@ typedef struct emul_unhandleable_monitor
     uint64_t address;
     uint16_t altp2m_view_id;
     void *map;
+    unsigned long instr;
 } emul_unhandleable_monitor_t;
 
 const char monitor_test_help[] = \
@@ -40,6 +42,17 @@ static emul_unhandleable_monitor_t monitor_instance =
     }
 };
 
+static int emul_unhandleable_mem_access(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
+static int emul_unhandleable_singlestep(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
+static int emul_unhandleable_emul_unimpl(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
+
+static xtf_evtchn_ops_t evtchn_handlers =
+{
+    .mem_access_handler     = emul_unhandleable_mem_access,
+    .singlestep_handler     = emul_unhandleable_singlestep,
+    .emul_unimpl_handler    = emul_unhandleable_emul_unimpl,
+};
+
 static xtf_evtchn_t evtchn_instance;
 
 static int emul_unhandleable_setup(int argc, char *argv[])
@@ -59,7 +72,7 @@ static int emul_unhandleable_setup(int argc, char *argv[])
         usage();
         return -EINVAL;
     }
-    while (1)
+    while ( 1 )
     {
         int option_index = 0;
         c = getopt_long(argc, argv, "ha:", long_options, &option_index);
@@ -93,6 +106,9 @@ static int emul_unhandleable_setup(int argc, char *argv[])
     }
 
     pmon->domain_id = atoi(argv[optind]);
+
+    printf("Domain_id = %d\n", pmon->domain_id);
+
     /* assert(evtchn_instance.domain_id) */
     add_evtchn(&evtchn_instance, pmon->domain_id);
 
@@ -105,7 +121,8 @@ static int emul_unhandleable_init()
     unsigned long gfn = 0x105;
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
 
-    /* assert(pmon) */
+    if ( !pmon )
+        return -EINVAL;
 
     rc = xtf_evtchn_init(pmon->domain_id);
     if ( rc < 0 )
@@ -181,22 +198,19 @@ static int emul_unhandleable_run()
 {
     int rc;
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
-    /* assert(pmon) */
 
-    /* Unpause the domain and start test */
-    rc = xc_domain_unpause(xtf_xch, pmon->domain_id);
-    if ( rc < 0 )
-    {
-        fprintf(stderr, "Error unpausing domain.\n");
-        return rc;
-    }
+    if ( !pmon )
+        return -EINVAL;
+
     return xtf_evtchn_loop(pmon->domain_id);
 }
 
 static int emul_unhandleable_cleanup()
 {
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
-    /* assert(pmon) */
+
+    if ( !pmon )
+        return -EINVAL;
 
     xtf_evtchn_cleanup(pmon->domain_id);
 
@@ -212,6 +226,55 @@ static int emul_unhandleable_cleanup()
     {
         munmap(pmon->map, 4096);
     }
+
+    return 0;
+}
+
+static int emul_unhandleable_mem_access(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp)
+{
+    emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
+    volatile unsigned long *p;
+
+    if (!pmon)
+        return -EINVAL;
+
+    rsp->flags |= VM_EVENT_FLAG_EMULATE;
+
+    p = (volatile unsigned long *)pmon->map;
+    pmon->instr = *p;
+    *p = 0xDEADBABE;
+
+    rsp->u.mem_access = req->u.mem_access;
+
+    return 0;
+}
+
+static int emul_unhandleable_singlestep(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp)
+{
+    emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
+
+    if (!pmon)
+        return -EINVAL;
+
+    rsp->flags |= VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
+    rsp->altp2m_idx = pmon->altp2m_view_id;
+
+    return 0;
+}
+
+static int emul_unhandleable_emul_unimpl(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp)
+{
+    emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
+    volatile unsigned long *p;
+
+    if (!pmon)
+        return -EINVAL;
+
+    p = (volatile unsigned long *)pmon->map;
+    *p = pmon->instr;
+
+    rsp->flags |= (VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP);
+    rsp->altp2m_idx = 0;
 
     return 0;
 }

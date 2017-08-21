@@ -25,6 +25,7 @@ xtf_monitor_t *get_monitor()
 xtf_evtchn_t *get_evtchn(domid_t domain_id)
 {
     (void)(domain_id);
+    printf("monitor->evt = %p\n", monitor->evt);
     return monitor->evt;
 }
 
@@ -39,8 +40,13 @@ int xtf_evtchn_init(domid_t domain_id)
     int rc;
     xtf_evtchn_t *evt = evtchn(domain_id);
 
+    printf("[DEBUG] xtf_evtchn_init\n");
+
     if ( !evt )
+    {
+        fprintf(stderr, "AAABP\n");
         return -EINVAL;
+    }
 
     evt->ring_page = xc_monitor_enable(monitor->xch, domain_id,
             &evt->remote_port);
@@ -117,14 +123,25 @@ static int xc_wait_for_event_or_timeout(xc_interface *xch, xenevtchn_handle *xce
     rc = poll(&fd, 1, ms);
     if ( rc == -1 )
     {
-        return (errno == EINTR) ? 0 : -errno;
+        if (errno == EINTR) 
+        {
+            printf("poll : EINTR RECEIVED ");
+            return 0;
+        }
+
+        printf("poll : received %d\n", errno);
+
+        return -errno;
     }
 
     if ( rc == 1 )
     {
         port = xenevtchn_pending(xce);
         if ( port == -1 )
+        {
+            printf("xenevtchn_pending returned -1, errno=%d\n", errno);
             return -errno;
+        }
 
         rc = xenevtchn_unmask(xce, port);
         if ( rc != 0 )
@@ -180,18 +197,29 @@ int xtf_evtchn_loop(domid_t domain_id)
     if ( !evt )
         return -EINVAL;
 
+    printf("xtf_evtchn_loop\n");
+
     for (;;)
     {
+        printf("Waiting for event ...");
         rc = xc_wait_for_event_or_timeout(xtf_xch, evt->xce_handle, 100);
         if ( rc < -1 )
         {
             fprintf(stderr, "Error getting event");
             return rc;
         }
+        else if ( rc != -1 )
+        {
+            printf("Got event from Xen\n");
+        }
+        
+        printf("rc = %d\n", rc);
 
         while ( RING_HAS_UNCONSUMED_REQUESTS(&evt->back_ring) )
         {
             xtf_evtchn_get_request(evt, &req);
+
+            printf("Event received.\n");
 
             if ( req.version != VM_EVENT_INTERFACE_VERSION )
             {
@@ -210,20 +238,26 @@ int xtf_evtchn_loop(domid_t domain_id)
             switch (req.reason)
             {
             case VM_EVENT_REASON_MEM_ACCESS:
+                printf("Check1\n");
                 if ( evt->ops->mem_access_handler )
-                    rc = evt->ops->mem_access_handler();
+                    rc = evt->ops->mem_access_handler(domain_id, &req, &rsp);
                 break;
             case VM_EVENT_REASON_SINGLESTEP:
+                printf("Check2\n");
                 if ( evt->ops->singlestep_handler )
-                    rc = evt->ops->singlestep_handler();
+                    rc = evt->ops->singlestep_handler(domain_id, &req, &rsp);
                 break;
             case VM_EVENT_REASON_EMUL_UNIMPLEMENTED:
+                printf("Check3\n");
                 if ( evt->ops->emul_unimpl_handler )
-                    evt->ops->emul_unimpl_handler();
+                    rc = evt->ops->emul_unimpl_handler(domain_id, &req, &rsp);
                 break;
             default:
                 fprintf(stderr, "Unknown request id = %d\n", req.reason);
             }
+
+            if ( rc )
+                return rc;
 
             /* Put the response on the ring */
             xtf_evtchn_put_response(evt, &rsp);
@@ -245,10 +279,14 @@ int main(int argc, char* argv[])
 {
     int rc;
 
+    printf("Gogu1\n");
+
     /* test specific setup sequence */
     rc = xtf_monitor_setup(argc, argv);
     if ( rc )
         return rc;
+
+    printf("Gogu2\n");
 
     monitor->xch = xc_interface_open(NULL, NULL, 0);
     if ( !monitor->xch )
@@ -257,11 +295,13 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    printf("Gogu3\n");
     /* test specific initialization sequence */
     rc = xtf_monitor_init();
     if ( rc )
         goto cleanup;
 
+    printf("Gogu4\n");
     /* Run test */
     rc = xtf_monitor_run();
     if ( rc )
@@ -274,6 +314,7 @@ cleanup:
     xtf_monitor_cleanup();
     xc_interface_close(monitor->xch);
 
+    printf("Gogu5 rc=%d\n", rc);
     return rc;
 }
 

@@ -12,9 +12,9 @@
 
 typedef struct xtf_evtchn_ops
 {
-    int (*mem_access_handler)(void);
-    int (*singlestep_handler)(void);
-    int (*emul_unimpl_handler)(void);
+    int (*mem_access_handler)(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
+    int (*singlestep_handler)(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
+    int (*emul_unimpl_handler)(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
 } xtf_evtchn_ops_t;
 
 /** XTF Event channel interface */
