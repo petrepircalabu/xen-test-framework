@@ -118,7 +118,7 @@ static int emul_unhandleable_setup(int argc, char *argv[])
 static int emul_unhandleable_init()
 {
     int rc = 0;
-    unsigned long gfn = 0x105;
+    unsigned long gfn = 0x106;
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
 
     if ( !pmon )
@@ -159,7 +159,7 @@ static int emul_unhandleable_init()
     }
 
     rc = xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
-            0x105, XENMEM_access_rw);
+            0x106, XENMEM_access_rw);
     if ( rc < 0 )
     {
         fprintf(stderr, "Error %d setting altp2m memory access!\n", rc);
@@ -167,7 +167,7 @@ static int emul_unhandleable_init()
     }
 
 
-    gfn = xc_translate_foreign_address(xtf_xch, pmon->domain_id, 0, 0x105000);
+    gfn = xc_translate_foreign_address(xtf_xch, pmon->domain_id, 0, 0x106000);
 
     pmon->map = xc_map_foreign_range(xtf_xch, pmon->domain_id, 4096,
             PROT_READ | PROT_WRITE , 0);
