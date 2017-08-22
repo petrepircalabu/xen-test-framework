@@ -67,6 +67,10 @@ class TestInstance(object):
         """ Return the VM name as `xl` expects it. """
         return repr(self)
 
+    def vm_path(self):
+        """ Return the VM path. """
+        return path.join("tests", self.name, repr(self))
+
     def cfg_path(self):
         """ Return the path to the `xl` config file for this test. """
         return path.join("tests", self.name, repr(self) + ".cfg")
@@ -453,24 +457,11 @@ def interpret_result(logline):
 
     return "CRASH"
 
-def get_test_domid(test):
-    """ Return the test's domid  """
-
-    cmd = ['xl', 'domid', test.vm_name()]
-
-    domid = Popen(cmd, stdout = PIPE, stderr = PIPE)
-
-    out, err = domid.communicate()
-
-    if domid.returncode:
-        raise RunnerError("Domain " + test + " not created")
-
-    return int(out)
-
 def start_monitor(test):
     print "Starting Monitor ... "
-    domid = get_test_domid(test)
-    cmd = [test.monitor_path(), '--address', 0x106000 , str(domid)]
+    cmd = [test.monitor_path() + " --address=0x$(nm --defined-only " +
+            test.vm_path() + " | grep test_fn | awk '{print $1}') " +
+            "$(xl domid " + test.vm_name() + ")"]
     print cmd
     return Popen(cmd, shell=True)
 
