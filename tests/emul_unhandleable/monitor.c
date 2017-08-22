@@ -61,7 +61,7 @@ static int emul_unhandleable_setup(int argc, char *argv[])
     int ret, c;
     static struct option long_options[] = {
         {"help",    no_argument,    0,  'h'},
-        {"address", no_argument,    0,  'a'},
+        {"address", required_argument,    0,  'a'},
         {0, 0, 0, 0}
     };
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
@@ -86,7 +86,9 @@ static int emul_unhandleable_setup(int argc, char *argv[])
                 exit(0);
                 break;
             case 'a':
-                pmon->address = atol(optarg);
+                printf("[DEBUG]: ");
+                pmon->address = strtoul(optarg, NULL, 0);
+                printf("pmon->address = 0x%08X\n", pmon->address);
                 break;
             default:
                 fprintf(stderr, "%s: Invalid option %s\n", argv[0], optarg);
@@ -119,7 +121,7 @@ static int emul_unhandleable_setup(int argc, char *argv[])
 static int emul_unhandleable_init()
 {
     int rc = 0;
-    unsigned long gfn = 0x106;
+    unsigned long gfn;
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
 
     if ( !pmon )
@@ -159,16 +161,26 @@ static int emul_unhandleable_init()
         return rc;
     }
 
+
+    gfn = xc_translate_foreign_address(xtf_xch, pmon->domain_id, 0, pmon->address);
+
+    printf ("address = %p gfn = 0x%x\n", pmon->address, gfn);
     rc = xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
-            0x106, XENMEM_access_rw);
+            gfn, XENMEM_access_rw);
     if ( rc < 0 )
     {
         fprintf(stderr, "Error %d setting altp2m memory access!\n", rc);
         return rc;
     }
 
+    rc = xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
+            gfn, XENMEM_access_rw);
+    if ( rc < 0 )
+    {
+        fprintf(stderr, "Error %d setting altp2m memory access!\n", rc);
+        return rc;
+    }
 
-    gfn = xc_translate_foreign_address(xtf_xch, pmon->domain_id, 0, 0x106000);
 
     pmon->map = xc_map_foreign_range(xtf_xch, pmon->domain_id, 4096,
             PROT_READ | PROT_WRITE , gfn);

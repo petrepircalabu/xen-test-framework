@@ -470,8 +470,9 @@ def get_test_domid(test):
 def start_monitor(test):
     print "Starting Monitor ... "
     domid = get_test_domid(test)
-    cmd = [test.monitor_path(), str(domid)]
-    return Popen(cmd)
+    cmd = [test.monitor_path(), '--address', 0x106000 , str(domid)]
+    print cmd
+    return Popen(cmd, shell=True)
 
 
 def run_test_console(opts, test):
@@ -500,16 +501,16 @@ def run_test_console(opts, test):
 
     if opts.monitor:
         monitor = start_monitor(test)
+    else:
+        cmd = ['xl', 'unpause', test.vm_name()]
+        if not opts.quiet:
+            print "Executing '%s'" % (" ".join(cmd), )
 
-#    cmd = ['xl', 'unpause', test.vm_name()]
-#    if not opts.quiet:
-#        print "Executing '%s'" % (" ".join(cmd), )
-
-#    rc = subproc_call(cmd)
-#    if rc:
-#        if opts.quiet:
-#            print "Executing '%s'" % (" ".join(cmd), )
-#        raise RunnerError("Failed to unpause VM")
+        rc = subproc_call(cmd)
+        if rc:
+            if opts.quiet:
+                print "Executing '%s'" % (" ".join(cmd), )
+            raise RunnerError("Failed to unpause VM")
 
     stdout, _ = console.communicate()
 
