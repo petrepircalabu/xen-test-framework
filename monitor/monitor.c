@@ -201,7 +201,6 @@ int xtf_evtchn_loop(domid_t domain_id)
 
     for (;;)
     {
-        printf("Waiting for event ...");
         rc = xc_wait_for_event_or_timeout(xtf_xch, evt->xce_handle, 100);
         if ( rc < -1 )
         {
@@ -213,8 +212,6 @@ int xtf_evtchn_loop(domid_t domain_id)
             printf("Got event from Xen\n");
         }
         
-        printf("rc = %d\n", rc);
-
         while ( RING_HAS_UNCONSUMED_REQUESTS(&evt->back_ring) )
         {
             xtf_evtchn_get_request(evt, &req);
@@ -238,26 +235,39 @@ int xtf_evtchn_loop(domid_t domain_id)
             switch (req.reason)
             {
             case VM_EVENT_REASON_MEM_ACCESS:
-                printf("Check1\n");
-                if ( evt->ops->mem_access_handler )
-                    rc = evt->ops->mem_access_handler(domain_id, &req, &rsp);
+                printf("mem_access rip = %016lx gfn = %lx offset = %lx gla =%lx\n",
+                   req.data.regs.x86.rip,
+                   req.u.mem_access.gfn,
+                   req.u.mem_access.offset,
+                   req.u.mem_access.gla);
+
+                if ( evt->ops.mem_access_handler )
+                    rc = evt->ops.mem_access_handler(domain_id, &req, &rsp);
                 break;
             case VM_EVENT_REASON_SINGLESTEP:
-                printf("Check2\n");
-                if ( evt->ops->singlestep_handler )
-                    rc = evt->ops->singlestep_handler(domain_id, &req, &rsp);
+                printf("Singlestep: rip=%016lx, vcpu %d, altp2m %u\n",
+                       req.data.regs.x86.rip,
+                       req.vcpu_id,
+                       req.altp2m_idx);
+                if ( evt->ops.singlestep_handler )
+                    rc = evt->ops.singlestep_handler(domain_id, &req, &rsp);
                 break;
             case VM_EVENT_REASON_EMUL_UNIMPLEMENTED:
-                printf("Check3\n");
-                if ( evt->ops->emul_unimpl_handler )
-                    rc = evt->ops->emul_unimpl_handler(domain_id, &req, &rsp);
+                printf("Emulation unimplemented: rip=%016lx, vcpu %d:\n",
+                       req.data.regs.x86.rip,
+                       req.vcpu_id);
+                if ( evt->ops.emul_unimpl_handler )
+                    rc = evt->ops.emul_unimpl_handler(domain_id, &req, &rsp);
                 break;
             default:
                 fprintf(stderr, "Unknown request id = %d\n", req.reason);
             }
 
             if ( rc )
+            {
+                printf("vm_event rc = %d\n", rc);
                 return rc;
+            }
 
             /* Put the response on the ring */
             xtf_evtchn_put_response(evt, &rsp);

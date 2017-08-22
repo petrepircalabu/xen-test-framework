@@ -25,7 +25,7 @@ typedef struct xtf_evtchn
     evtchn_port_t local_port;               /**< Event channel local port */
     vm_event_back_ring_t back_ring;         /**< vm_event back ring */
     void *ring_page;                        /**< Shared ring page */
-    xtf_evtchn_ops_t *ops;                  /**< Test specific event callbacks */
+    xtf_evtchn_ops_t ops;                  /**< Test specific event callbacks */
 } xtf_evtchn_t;
 
 int add_evtchn(xtf_evtchn_t *evt, domid_t domain_id);

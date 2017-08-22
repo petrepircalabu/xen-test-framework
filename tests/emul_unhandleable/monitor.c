@@ -18,7 +18,7 @@ typedef struct emul_unhandleable_monitor
     uint64_t address;
     uint16_t altp2m_view_id;
     void *map;
-    unsigned long instr;
+    unsigned int instr;
 } emul_unhandleable_monitor_t;
 
 const char monitor_test_help[] = \
@@ -46,14 +46,15 @@ static int emul_unhandleable_mem_access(domid_t domain_id, vm_event_request_t *r
 static int emul_unhandleable_singlestep(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
 static int emul_unhandleable_emul_unimpl(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp);
 
-static xtf_evtchn_ops_t evtchn_handlers =
+static xtf_evtchn_t evtchn_instance =
 {
-    .mem_access_handler     = emul_unhandleable_mem_access,
-    .singlestep_handler     = emul_unhandleable_singlestep,
-    .emul_unimpl_handler    = emul_unhandleable_emul_unimpl,
+    .ops = 
+    {
+        .mem_access_handler     = emul_unhandleable_mem_access,
+        .singlestep_handler     = emul_unhandleable_singlestep,
+        .emul_unimpl_handler    = emul_unhandleable_emul_unimpl,
+    }
 };
-
-static xtf_evtchn_t evtchn_instance;
 
 static int emul_unhandleable_setup(int argc, char *argv[])
 {
@@ -170,7 +171,7 @@ static int emul_unhandleable_init()
     gfn = xc_translate_foreign_address(xtf_xch, pmon->domain_id, 0, 0x106000);
 
     pmon->map = xc_map_foreign_range(xtf_xch, pmon->domain_id, 4096,
-            PROT_READ | PROT_WRITE , 0);
+            PROT_READ | PROT_WRITE , gfn);
     if ( !pmon->map )
     {
         fprintf(stderr, "Failed to map page.\n");
@@ -240,16 +241,20 @@ static int emul_unhandleable_cleanup()
 static int emul_unhandleable_mem_access(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp)
 {
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
-    volatile unsigned long *p;
+    volatile unsigned int *p;
 
     if (!pmon)
         return -EINVAL;
 
     rsp->flags |= VM_EVENT_FLAG_EMULATE;
 
-    p = (volatile unsigned long *)pmon->map;
+    p = (volatile unsigned int  *)pmon->map;
     pmon->instr = *p;
     *p = 0xDEADBABE;
+
+    printf("gogu: sizeof = %d\n", sizeof(*p));
+
+    printf("gogu: 0x%04X \n", *p );
 
     rsp->u.mem_access = req->u.mem_access;
 
@@ -272,15 +277,15 @@ static int emul_unhandleable_singlestep(domid_t domain_id, vm_event_request_t *r
 static int emul_unhandleable_emul_unimpl(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp)
 {
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
-    volatile unsigned long *p;
+    volatile unsigned int *p;
 
     if (!pmon)
         return -EINVAL;
 
-    p = (volatile unsigned long *)pmon->map;
+    p = (volatile unsigned int *)pmon->map;
     *p = pmon->instr;
 
-    rsp->flags |= (VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP);
+    rsp->flags |= VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
     rsp->altp2m_idx = 0;
 
     return 0;
