@@ -68,7 +68,8 @@ static int emul_unhandleable_setup(int argc, char *argv[])
     };
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
 
-    /* assert(pmon) */
+    if ( !pmon )
+        return -EINVAL;
 
     if ( argc == 1 )
     {
@@ -88,9 +89,7 @@ static int emul_unhandleable_setup(int argc, char *argv[])
                 exit(0);
                 break;
             case 'a':
-                printf("[DEBUG]: ");
                 pmon->address = strtoul(optarg, NULL, 0);
-                printf("pmon->address = 0x%08X\n", pmon->address);
                 break;
             default:
                 fprintf(stderr, "%s: Invalid option %s\n", argv[0], optarg);
@@ -112,9 +111,12 @@ static int emul_unhandleable_setup(int argc, char *argv[])
 
     pmon->domain_id = atoi(argv[optind]);
 
-    printf("Domain_id = %d\n", pmon->domain_id);
+    if ( pmon->domain_id <= 0 )
+    {
+        fprintf(stderr, "%s: Invalid domain id\n");
+        return -EINVAL;
+    }
 
-    /* assert(evtchn_instance.domain_id) */
     add_evtchn(&evtchn_instance, pmon->domain_id);
 
     return 0;
@@ -146,7 +148,6 @@ static int emul_unhandleable_init()
         return rc;
     }
 
-
     rc = xc_altp2m_set_domain_state(xtf_xch, pmon->domain_id, 1);
     if ( rc < 0 )
     {
@@ -162,26 +163,7 @@ static int emul_unhandleable_init()
         return rc;
     }
 
-
     pmon->gfn = xc_translate_foreign_address(xtf_xch, pmon->domain_id, 0, pmon->address);
-
-    printf ("address = %p gfn = 0x%x\n", pmon->address, pmon->gfn);
-    rc = xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
-            pmon->gfn, XENMEM_access_rw);
-    if ( rc < 0 )
-    {
-        fprintf(stderr, "Error %d setting altp2m memory access!\n", rc);
-        return rc;
-    }
-
-    rc = xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
-            pmon->gfn, XENMEM_access_rw);
-    if ( rc < 0 )
-    {
-        fprintf(stderr, "Error %d setting altp2m memory access!\n", rc);
-        return rc;
-    }
-
 
     pmon->map = xc_map_foreign_range(xtf_xch, pmon->domain_id, 4096,
             PROT_READ | PROT_WRITE , pmon->gfn);
@@ -189,6 +171,14 @@ static int emul_unhandleable_init()
     {
         fprintf(stderr, "Failed to map page.\n");
         return -1;
+    }
+
+    rc = xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
+            pmon->gfn, XENMEM_access_rw);
+    if ( rc < 0 )
+    {
+        fprintf(stderr, "Error %d setting altp2m memory access!\n", rc);
+        return rc;
     }
 
     rc = xc_altp2m_switch_to_view(xtf_xch, pmon->domain_id, pmon->altp2m_view_id );
@@ -233,7 +223,10 @@ static int emul_unhandleable_cleanup()
     if ( !pmon )
         return -EINVAL;
 
-    xtf_evtchn_cleanup(pmon->domain_id);
+    if (pmon->map)
+    {
+        munmap(pmon->map, 4096);
+    }
 
     xc_altp2m_switch_to_view(xtf_xch, pmon->domain_id, 0 );
 
@@ -243,10 +236,7 @@ static int emul_unhandleable_cleanup()
 
     xc_monitor_singlestep(xtf_xch, pmon->domain_id, 0);
 
-    if (pmon->map)
-    {
-        munmap(pmon->map, 4096);
-    }
+    xtf_evtchn_cleanup(pmon->domain_id);
 
     return 0;
 }
@@ -272,13 +262,12 @@ static int emul_unhandleable_mem_access(domid_t domain_id, vm_event_request_t *r
     pmon->instr[4] = *(p + 4);
     *(p + 0) = 0xD9;
     *(p + 1) = 0x20;
-    *(p + 2) = 0xBA;
-    *(p + 3) = 0xBE;
-    *(p + 4) = 0xBA;
+    *(p + 2) = 0x00;
+    *(p + 3) = 0x00;
+    *(p + 4) = 0x00;
     pmon->instr_size = 5;
 
     rsp->u.mem_access = req->u.mem_access;
-
     return 0;
 }
 
@@ -289,27 +278,30 @@ static int emul_unhandleable_singlestep(domid_t domain_id, vm_event_request_t *r
     if (!pmon)
         return -EINVAL;
 
-    rsp->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
+    rsp->flags |= VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
     rsp->altp2m_idx = pmon->altp2m_view_id;
 
+    /* Restore the execute rights on the test page. */
+    xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
+        pmon->gfn, XENMEM_access_rwx);
     return 0;
 }
 
 static int emul_unhandleable_emul_unimpl(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp)
 {
     emul_unhandleable_monitor_t *pmon = (emul_unhandleable_monitor_t *)monitor;
-    volatile unsigned int *p;
+    volatile unsigned char *p;
     int i;
 
     if (!pmon)
         return -EINVAL;
 
-    p = (volatile unsigned int *)(pmon->map + req->u.mem_access.offset);
+    p = (volatile unsigned char *)(pmon->map + req->u.mem_access.offset);
 
     for (i = 0; i < pmon->instr_size; i++)
         *(p + i) = pmon->instr[i];
 
-    rsp->flags |= VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
+    rsp->flags |= VM_EVENT_FLAG_ALTERNATE_P2M ;
     rsp->altp2m_idx = 0;
 
     return 0;

@@ -462,7 +462,6 @@ def start_monitor(test):
     cmd = [test.monitor_path() + " --address=0x$(nm --defined-only " +
             test.vm_path() + " | grep test_fn | awk '{print $1}') " +
             "$(xl domid " + test.vm_name() + ")"]
-    print cmd
     return Popen(cmd, shell=True)
 
 
