@@ -44,14 +44,18 @@ hvm64-format := $(firstword $(filter elf32-x86-64,$(shell $(OBJCOPY) --help)) el
 
 define PERENV_build
 
+# Generate .lds with approprate flags
+link-$(1)-$(NAME).lds: $$(LDS_TEMPLATE)
+	$$(CPP) $$(AFLAGS_$(1)) -P -C $$< -o $$@
+
 ifneq ($(1),hvm64)
 # Generic link line for most environments
-test-$(1)-$(NAME): $$(DEPS-$(1)) $$(link-$(1))
-	$(CC) $$(LDFLAGS_$(1)) $$(DEPS-$(1)) -o $$@
+test-$(1)-$(NAME): $$(DEPS-$(1)) link-$(1)-$(NAME).lds
+	$(CC) -Wl,-T,link-$(1)-$(NAME).lds $$(LDFLAGS_$(1)) $$(DEPS-$(1)) -o $$@
 else
 # hvm64 needs linking normally, then converting to elf32-x86-64 or elf32-i386
-test-$(1)-$(NAME): $$(DEPS-$(1)) $$(link-$(1))
-	$(CC) $$(LDFLAGS_$(1)) $$(DEPS-$(1)) -o $$@.tmp
+test-$(1)-$(NAME): $$(DEPS-$(1)) link-$(1)-$(NAME).lds
+	$(CC) -Wl,-T,link-$(1)-$(NAME).lds $$(LDFLAGS_$(1)) $$(DEPS-$(1)) -o $$@.tmp
 	$(OBJCOPY) $$@.tmp -O $(hvm64-format) $$@
 	rm -f $$@.tmp
 endif
@@ -72,7 +76,7 @@ test-$(1)-$(NAME)~%.cfg: $$(cfg-default-deps) $(ROOT)/config/%.cfg.in
 	$(PYTHON) $$< $$@.tmp "$$(cfg-$(1))" "$(TEST-EXTRA-CFG)" "$(ROOT)/config/$$*.cfg.in"
 	@$(call move-if-changed,$$@.tmp,$$@)
 
--include $$(link-$(1):%.lds=%.d)
+-include $$(link-$(1)-$(NAME):%.lds=%.d)
 -include $$(DEPS-$(1):%.o=%.d)
 
 .PHONY: install-$(1) install-$(1).cfg
