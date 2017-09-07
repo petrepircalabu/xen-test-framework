@@ -297,6 +297,21 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    monitor->xsh = xs_open(XS_OPEN_READONLY);
+    if ( !monitor->xsh )
+    {
+        XTF_MON_FATAL("Error opening XEN store\n");
+        rc = -EINVAL;
+        goto cleanup;
+    }
+
+    if ( !xs_watch( monitor->xsh, "@releaseDomain", "RELEASE_TOKEN") )
+    {
+        XTF_MON_FATAL("Error monitoring releaseDomain\n");
+        rc = -EINVAL;
+        goto cleanup;
+    }
+
     /* test specific initialization sequence */
     rc = xtf_monitor_init();
     if ( rc )
@@ -312,6 +327,13 @@ int main(int argc, char* argv[])
 cleanup:
     /* test specific cleanup sequence */
     xtf_monitor_cleanup();
+    if ( monitor->xsh )
+    {
+        xs_unwatch(monitor->xsh, "@releaseDomain", "RELEASE_TOKEN");
+        xs_close(monitor->xsh);
+        monitor->xsh = NULL;
+    }
+
     xc_interface_close(monitor->xch);
 
     return rc;
