@@ -6,6 +6,8 @@ TEST-ENVS := hvm64
 
 TEST-EXTRA-CFG := extra.cfg.in
 
+LDS_TEMPLATE = link.lds.S
+
 obj-perenv += main.o
 
 obj-monitor += monitor.o
