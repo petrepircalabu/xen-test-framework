@@ -11,6 +11,7 @@
 /selftests/test-*
 /tests/*/test-*
 /tests/*/info.json
+/tests/*/link-*.lds
 /GPATH
 /GRTAGS
 /GTAGS
