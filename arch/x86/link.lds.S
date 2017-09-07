@@ -42,11 +42,6 @@ SECTIONS
                 *(.text.user)
 	. = ALIGN(PAGE_SIZE);
         __end_user_text = .;
-        . = ALIGN(PAGE_SIZE);
-        __start_secondary_text = .;
-                *(.text.secondary)
-        . = ALIGN(PAGE_SIZE);
-        __end_secondary_text = .;
 
         } :load = 0
 
