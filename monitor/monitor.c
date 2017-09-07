@@ -134,7 +134,7 @@ int xtf_evtchn_cleanup(domid_t domain_id)
     return 0;
 }
 
-static int xc_wait_for_event_or_timeout(xc_interface *xch, xenevtchn_handle *xce, unsigned long ms)
+static int xtf_wait_for_event(xc_interface *xch, xenevtchn_handle *xce, unsigned long ms)
 {
     struct pollfd fd = { .fd = xenevtchn_fd(xce), .events = POLLIN | POLLERR };
     int port;
@@ -206,7 +206,7 @@ int xtf_evtchn_loop(domid_t domain_id)
 
     for (;;)
     {
-        rc = xc_wait_for_event_or_timeout(xtf_xch, evt->xce_handle, 100);
+        rc = xtf_wait_for_event(xtf_xch, evt->xce_handle, 100);
         if ( rc < -1 )
         {
             XTF_MON_ERROR("Error getting event");

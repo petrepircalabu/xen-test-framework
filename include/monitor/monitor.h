@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <xenctrl.h>
 #include <xenevtchn.h>
+#include <xenstore.h>
 #include <xen/vm_event.h>
 
 typedef enum
@@ -44,7 +45,7 @@ typedef struct xtf_evtchn
     evtchn_port_t local_port;               /**< Event channel local port */
     vm_event_back_ring_t back_ring;         /**< vm_event back ring */
     void *ring_page;                        /**< Shared ring page */
-    xtf_evtchn_ops_t ops;                  /**< Test specific event callbacks */
+    xtf_evtchn_ops_t ops;                   /**< Test specific event callbacks */
 } xtf_evtchn_t;
 
 int add_evtchn(xtf_evtchn_t *evt, domid_t domain_id);
@@ -55,6 +56,7 @@ xtf_evtchn_t *get_evtchn(domid_t domain_id);
 typedef struct xtf_monitor
 {
     xc_interface *xch;                      /**< Control interface */
+    struct xs_handle *xsh;                  /**< XEN store handle */
     xtf_evtchn_t *evt;                      /**< Event channel list */
     xtf_mon_log_level_t log_lvl;            /**< Log Level */
     int (*setup)(int, char*[]);             /**< Test specific setup */
@@ -66,6 +68,7 @@ typedef struct xtf_monitor
 xtf_monitor_t *get_monitor();
 #define monitor ( get_monitor() )
 #define xtf_xch ( monitor->xch )
+#define xtf_xsh ( monitor->xsh )
 
 #define call_helper(func, ... )         ( (func) ? func(__VA_ARGS__) : 0 )
 #define xtf_monitor_setup(argc, argv)   ( call_helper(monitor->setup, argc, argv) )
