@@ -113,7 +113,7 @@ static int emul_unimpl_setup(int argc, char *argv[])
 
     if ( pmon->domain_id <= 0 )
     {
-        XTF_MON_ERROR("%s: Invalid domain id\n");
+        XTF_MON_ERROR("%s: Invalid domain id\n", argv[0]);
         return -EINVAL;
     }
 
