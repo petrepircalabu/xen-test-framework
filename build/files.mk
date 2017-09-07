@@ -25,6 +25,7 @@ obj-perenv += $(ROOT)/arch/x86/hypercall_page.o
 obj-perenv += $(ROOT)/arch/x86/setup.o
 obj-perenv += $(ROOT)/arch/x86/traps.o
 
+LDS_TEMPLATE ?= $(ROOT)/arch/x86/link.lds.S
 
 # HVM specific objects
 obj-hvm += $(ROOT)/arch/x86/apic.o
