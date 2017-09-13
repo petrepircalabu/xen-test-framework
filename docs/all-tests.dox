@@ -35,6 +35,7 @@ Coveres XSA-106 and XSA-156.
 
 @subpage test-umip - Guest User-Mode Instruction Prevention support.
 
+@subpage test-hvmop-altp2m-set-mem-access-multi - @Test HVMOP_altp2m_set_access_multi
 
 @section index-xsa XSA Proof-of-Concept tests
 
