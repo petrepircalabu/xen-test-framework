@@ -1,0 +1,3 @@
+# Enable altp2m
+altp2m = "mixed"
+altp2mhvm = 1
