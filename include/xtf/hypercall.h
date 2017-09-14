@@ -198,6 +198,40 @@ static inline int hvm_get_param(unsigned int idx, uint64_t *value)
     return rc;
 }
 
+static inline int hvm_altp2m_set_domain_state(bool state)
+{
+    xen_hvm_altp2m_op_t p = {
+        .version = HVMOP_ALTP2M_INTERFACE_VERSION,
+        .cmd = HVMOP_altp2m_set_domain_state,
+        .domain = DOMID_SELF,
+        .pad1 = 0,
+        .pad2 = 0,
+        .u.domain_state.state = state,
+    };
+
+    return hypercall_hvm_op(HVMOP_altp2m, &p);
+}
+
+static inline int hvm_altp2m_create_view(uint16_t default_access, uint16_t *view_id)
+{
+    int rc;
+    xen_hvm_altp2m_op_t p = {
+        .version = HVMOP_ALTP2M_INTERFACE_VERSION,
+        .cmd = HVMOP_altp2m_create_p2m,
+        .domain = DOMID_SELF,
+        .pad1 = 0,
+        .pad2 = 0,
+        .u.view.view = -1,
+        .u.view.hvmmem_default_access = default_access,
+    };
+
+    rc = hypercall_hvm_op(HVMOP_altp2m, &p);
+    if ( !rc )
+        *view_id = p.u.view.view;
+
+    return rc;
+}
+
 #endif /* XTF_HYPERCALL_H */
 
 /*
