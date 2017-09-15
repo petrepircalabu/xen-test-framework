@@ -35,6 +35,22 @@ struct xen_hvm_altp2m_view {
 };
 typedef struct xen_hvm_altp2m_view xen_hvm_altp2m_view_t;
 
+struct xen_hvm_altp2m_set_mem_access_multi {
+    /* view */
+    uint16_t view;
+    uint16_t pad;
+    /* Number of pages */
+    uint32_t nr;
+    /* Used for continuation purposes */
+    uint64_t opaque;
+    /* List of pfns to set access for */
+    guest_handle_64_t pfn_list;
+    /* Corresponding list of access settings for pfn_list */
+    guest_handle_64_t access_list;
+};
+typedef struct xen_hvm_altp2m_set_mem_access_multi
+    xen_hvm_altp2m_set_mem_access_multi_t;
+
 struct xen_hvm_altp2m_op {
     uint32_t version;   /* HVMOP_ALTP2M_INTERFACE_VERSION */
     uint32_t cmd;
@@ -67,8 +83,8 @@ struct xen_hvm_altp2m_op {
 #if 0
         struct xen_hvm_altp2m_set_mem_access       set_mem_access;
         struct xen_hvm_altp2m_change_gfn           change_gfn;
-        struct xen_hvm_altp2m_set_mem_access_multi set_mem_access_multi;
 #endif
+        struct xen_hvm_altp2m_set_mem_access_multi set_mem_access_multi;
         uint8_t pad[64];
     } u;
 };
