@@ -232,6 +232,40 @@ static inline int hvm_altp2m_create_view(uint16_t default_access, uint16_t *view
     return rc;
 }
 
+static inline int hvm_altp2m_set_mem_access_multi(uint16_t view_id, xenmem_access_t *access, uint64_t *pages, uint32_t nr)
+{
+    int rc;
+    xen_hvm_altp2m_op_t p = {
+        .version = HVMOP_ALTP2M_INTERFACE_VERSION,
+        .cmd = HVMOP_altp2m_set_mem_access_multi,
+        .domain = DOMID_SELF,
+        .pad1 = 0,
+        .pad2 = 0,
+        .u.set_mem_access_multi.view = view_id,
+        .u.set_mem_access_multi.nr = nr,
+        .u.set_mem_access_multi.pfn_list.p = pages,
+        .u.set_mem_access_multi.access_list.p = access,
+    };
+
+    /* FIXME: bounce pre */
+    rc = hypercall_hvm_op(HVMOP_altp2m, &p);
+    /* FIXME: bounce post */
+    return rc;
+}
+
+static inline int hvm_altp2m_switch_to_view(uint16_t view_id)
+{
+    xen_hvm_altp2m_op_t p = {
+        .version = HVMOP_ALTP2M_INTERFACE_VERSION,
+        .cmd = HVMOP_altp2m_switch_p2m,
+        .domain = DOMID_SELF,
+        .pad1 = 0,
+        .pad2 = 0,
+        .u.view.view = view_id,
+    };
+    return hypercall_hvm_op(HVMOP_altp2m, &p);
+}
+
 #endif /* XTF_HYPERCALL_H */
 
 /*
