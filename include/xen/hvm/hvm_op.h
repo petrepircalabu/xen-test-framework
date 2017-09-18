@@ -34,6 +34,17 @@ struct xen_hvm_altp2m_vcpu_enable_notify {
 };
 typedef struct xen_hvm_altp2m_vcpu_enable_notify xen_hvm_altp2m_vcpu_enable_notify_t;
 
+struct xen_hvm_altp2m_set_mem_access {
+    /* view */
+    uint16_t view;
+    /* Memory type */
+    uint16_t hvmmem_access; /* xenmem_access_t */
+    uint32_t pad;
+    /* gfn */
+    uint64_t gfn;
+};
+typedef struct xen_hvm_altp2m_set_mem_access xen_hvm_altp2m_set_mem_access_t;
+
 struct xen_hvm_altp2m_view {
     /* IN/OUT variable */
     uint16_t view;
@@ -86,8 +97,8 @@ struct xen_hvm_altp2m_op {
         struct xen_hvm_altp2m_domain_state         domain_state;
         struct xen_hvm_altp2m_vcpu_enable_notify   enable_notify;
         struct xen_hvm_altp2m_view                 view;
-#if 0
         struct xen_hvm_altp2m_set_mem_access       set_mem_access;
+#if 0
         struct xen_hvm_altp2m_change_gfn           change_gfn;
 #endif
         struct xen_hvm_altp2m_set_mem_access_multi set_mem_access_multi;

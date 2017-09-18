@@ -247,6 +247,21 @@ static inline int hvm_altp2m_vcpu_enable_notify(uint32_t vcpu_id, uint64_t gfn)
     return hypercall_hvm_op(HVMOP_altp2m, &p);
 }
 
+static inline int hvm_altp2m_set_mem_access(uint16_t view_id, uint64_t gfn, xenmem_access_t access)
+{
+    xen_hvm_altp2m_op_t p = {
+        .version = HVMOP_ALTP2M_INTERFACE_VERSION,
+        .cmd = HVMOP_altp2m_set_mem_access,
+        .domain = DOMID_SELF,
+        .pad1 = 0,
+        .pad2 = 0,
+        .u.set_mem_access.view = view_id,
+        .u.set_mem_access.hvmmem_access = access,
+        .u.set_mem_access.gfn = gfn,
+    };
+    return hypercall_hvm_op(HVMOP_altp2m, &p);
+}
+
 static inline int hvm_altp2m_set_mem_access_multi(uint16_t view_id, xenmem_access_t *access, uint64_t *pages, uint32_t nr)
 {
     int rc;
