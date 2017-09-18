@@ -16,25 +16,27 @@ static uint8_t test_page1[PAGE_SIZE] __page_aligned_bss;
 static uint8_t test_page2[PAGE_SIZE] __page_aligned_bss;
 static uint8_t test_page3[PAGE_SIZE] __page_aligned_bss;
 
+xenmem_access_t default_access = XENMEM_access_rwx;
+xenmem_access_t access[3] = {
+    XENMEM_access_rw,
+    XENMEM_access_r,
+    XENMEM_access_rw,
+};
+uint16_t view_id = 0;
+uint64_t pages[3];
+
 /** Print expected information in the case of an unexpected exception. */
 bool unhandled_exception(struct cpu_regs *regs)
 {
-    printk("Unhandled Exception at %p\n", _p(regs));
+    if ( hvm_altp2m_set_mem_access(view_id, pages[1], XENMEM_access_rw) < 0 )
+        return false;
 
-    return false;
+    return true;
 }
 
 void test_main(void)
 {
     int rc;
-    xenmem_access_t default_access = XENMEM_access_rwx;
-    xenmem_access_t access[3] = {
-        XENMEM_access_r,
-        XENMEM_access_r,
-        XENMEM_access_r,
-    };
-    uint16_t view_id = 0;
-    uint64_t pages[3];
 
     rc = hvm_altp2m_set_domain_state(true);
     if ( rc < 0 )
@@ -55,7 +57,9 @@ void test_main(void)
     if ( rc < 0 )
         return xtf_error("Error %d setting altp2m access!\n", rc);
 
-    printk("Switch to view %d\n", view_id);
+    rc = hvm_altp2m_vcpu_enable_notify(0, pages[1]);
+    if ( rc < 0 )
+        return xtf_error("Error %d enabling vcpu notify!\n", rc);
 
     rc = hvm_altp2m_switch_to_view(view_id);
     if ( rc < 0 )
