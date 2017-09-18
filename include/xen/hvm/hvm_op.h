@@ -26,6 +26,14 @@ struct xen_hvm_altp2m_domain_state {
 };
 typedef struct xen_hvm_altp2m_domain_state xen_hvm_altp2m_domain_state_t;
 
+struct xen_hvm_altp2m_vcpu_enable_notify {
+    uint32_t vcpu_id;
+    uint32_t pad;
+    /* #VE info area gfn */
+    uint64_t gfn;
+};
+typedef struct xen_hvm_altp2m_vcpu_enable_notify xen_hvm_altp2m_vcpu_enable_notify_t;
+
 struct xen_hvm_altp2m_view {
     /* IN/OUT variable */
     uint16_t view;
@@ -76,9 +84,7 @@ struct xen_hvm_altp2m_op {
     uint32_t pad2;
     union {
         struct xen_hvm_altp2m_domain_state         domain_state;
-#if 0
         struct xen_hvm_altp2m_vcpu_enable_notify   enable_notify;
-#endif
         struct xen_hvm_altp2m_view                 view;
 #if 0
         struct xen_hvm_altp2m_set_mem_access       set_mem_access;
