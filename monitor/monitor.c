@@ -251,6 +251,7 @@ int xtf_evtchn_loop(domid_t domain_id)
                 if ( evt->ops.singlestep_handler )
                     rc = evt->ops.singlestep_handler(domain_id, &req, &rsp);
                 break;
+#ifdef VM_EVENT_REASON_EMUL_UNIMPLEMENTED
             case VM_EVENT_REASON_EMUL_UNIMPLEMENTED:
                 XTF_MON_INFO("Emulation unimplemented: rip=%016lx, vcpu %d:\n",
                     req.data.regs.x86.rip,
@@ -258,6 +259,7 @@ int xtf_evtchn_loop(domid_t domain_id)
                 if ( evt->ops.emul_unimpl_handler )
                     rc = evt->ops.emul_unimpl_handler(domain_id, &req, &rsp);
                 break;
+#endif
             default:
                 XTF_MON_ERROR("Unknown request id = %d\n", req.reason);
             }

@@ -141,12 +141,14 @@ static int emul_unimpl_init()
         return rc;
     }
 
+#ifdef VM_EVENT_REASON_EMUL_UNIMPLEMENTED
     rc = xc_monitor_emul_unimplemented(xtf_xch, pmon->domain_id, 1);
     if ( rc < 0 )
     {
         XTF_MON_ERROR("Error %d emulation unimplemented with vm_event\n", rc);
         return rc;
     }
+#endif
 
     rc = xc_altp2m_set_domain_state(xtf_xch, pmon->domain_id, 1);
     if ( rc < 0 )
