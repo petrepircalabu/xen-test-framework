@@ -28,10 +28,8 @@ uint64_t pages[3];
 /** Print expected information in the case of an unexpected exception. */
 bool unhandled_exception(struct cpu_regs *regs)
 {
-    if ( hvm_altp2m_set_mem_access(view_id, pages[1], XENMEM_access_rw) < 0 )
-        return false;
-
-    return true;
+    hvm_altp2m_set_mem_access(view_id, pages[1], XENMEM_access_rw);
+    return false;
 }
 
 void test_main(void)
