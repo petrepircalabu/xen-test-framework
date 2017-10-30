@@ -8,7 +8,5 @@ Run DomU
 	File Should Exist		${cfg}
 	${domid}=			XTFLibrary.Create	${cfg}
 	XTFLibrary.Resume		${domid}
-	XTFLibrary.WaitForPattern	${domid}		SUCCESS		10
+	XTFLibrary.WaitForCompletion	${domid}
 	XTFLibrary.Cleanup		${domid}		10
-
-
