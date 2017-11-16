@@ -1,0 +1,5 @@
+<?xml version="1.0" ?>
+<class-directory>
+	<class kind="target"    name="xl_target.XLTarget"/>
+	<class kind="resource"  name="xl_domu.XLDomUResource"/>
+</class-directory>
