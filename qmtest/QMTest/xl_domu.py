@@ -15,9 +15,7 @@ class XLDomUResource(Resource):
     conf_file = TextField(description="XL configuration file")
 
     def SetUp(self, context, result):
-
-        pass
+        context["gogu"] = "vasile"
 
     def CleanUp(self, result):
-
         pass
