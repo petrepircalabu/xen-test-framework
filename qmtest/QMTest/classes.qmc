@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <class-directory>
-	<class kind="resource"  name="xl_domu.XLDomUResource"/>
+	<class kind="resource"  name="xl_domu_resource.XLDomUResource"/>
 	<class kind="target"    name="xl_target.XLTarget"/>
 	<class kind="test"      name="xtf_simple.XTFSimpleTest"/>
 </class-directory>
