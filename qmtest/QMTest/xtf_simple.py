@@ -14,5 +14,5 @@ class XTFSimpleTest(Test):
 
     def Run(self, context, result):
         """Run the test."""
-
-        pass
+        domu = context["domu_object"]
+        domu.unpause()
