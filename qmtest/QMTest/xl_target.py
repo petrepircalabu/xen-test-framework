@@ -1,12 +1,9 @@
+"""Xen target using the XL toolstack"""
 ########################################################################
 # Imports
 #######################################################################
 
-import imp
-import os
-
 from   qm.test.target import Target
-from   subprocess import Popen, PIPE, call as subproc_call
 from   qm.temporary_directory import TemporaryDirectory
 
 ########################################################################
@@ -14,6 +11,7 @@ from   qm.temporary_directory import TemporaryDirectory
 #######################################################################
 
 class XLTarget(Target):
+    """Xen target using the XL toolstack"""
     def __init__(self, database, properties):
 
         super(XLTarget, self).__init__(database, properties)
