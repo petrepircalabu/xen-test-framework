@@ -7,9 +7,7 @@
   <argument name="prerequisites">
     <set/>
   </argument>
-  <argument name="resources">
-    <set>
-      <text>cpuid-faulting.test-hvm32-cpuid-faulting</text>
-    </set>
-  </argument>
+  <argument name="conf_file">
+    <text>tests/cpuid-faulting/test-hvm32-cpuid-faulting.cfg</text>
+  </argument>  
 </extension>
