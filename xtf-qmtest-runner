@@ -1,0 +1,125 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+xtf-qmtest-runner Utility for running XTF test using the QMTest framework.
+"""
+
+########################################################################
+# Imports
+########################################################################
+
+import gc
+import os
+import os.path
+import sys
+import traceback
+import qm
+if sys.platform != "win32":
+    import qm.sigmask
+
+from   qm.test.cmdline import _the_qmtest
+from   qm.test.database import get_database, set_path
+
+class XTFQMTest(object):
+    """XTF QMTest instalce"""
+    def __init__(self, argument_list, path):
+
+        global _the_qmtest
+        _the_qmtest = self
+
+    def __call__(self):
+        return self._execute_run()
+
+    def _execute_run(self):
+        """Executes the available tests"""
+
+        database = get_database()
+
+        if database is None:
+            print "ERROR: No database found"
+            return 2
+
+        print "OKAY"
+        return 0
+
+########################################################################
+# Functions
+########################################################################
+
+def print_error_message(message):
+    """Output an error message.
+
+    'message' -- Structured text for the error message to emit.  The
+    messing is emitted to the standard error stream with an
+    identifying prefix."""
+
+    prefix = "qmtest: error: "
+    message = qm.structured_text.to_text(str(message),
+                                         indent=len(prefix))
+    message = prefix + message[len(prefix):]
+    sys.stderr.write(message)
+
+def main():
+    """ xtf-qmtest-runner entry point. """
+
+    # Normalise $CWD to the directory this script is in
+    os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
+
+    if sys.platform != "win32":
+        qm.sigmask.save_mask()
+
+    # Parse the command line.
+    command = XTFQMTest(sys.argv[1:], sys.argv[0])
+
+    # Execute the command.
+    return command()
+
+if __name__ == "__main__":
+    # Assume that something will go wrong.
+    exit_code = 2
+
+    try:
+        # Set database path
+        set_path(os.path.join(os.getcwd(), "qmtest"))
+
+        # Set the program name.
+        qm.common.program_name = "QMTest"
+
+        # Load messages.
+        qm.diagnostic.load_messages("test")
+
+        # Load RC options.
+        qm.rc.Load("test")
+
+        try:
+            exit_code = main()
+        except qm.cmdline.CommandError, msg:
+            print_error_message(msg)
+            sys.stderr.write(
+                "Run 'xtf-qmtest-runner --help'\n")
+        except qm.common.QMException, msg:
+            print_error_message(msg)
+        except NotImplementedError:
+            exc_info = sys.exc_info()
+            method_name = traceback.extract_tb(exc_info[2])[-1][2]
+            print_error_message(qm.message("not implemented",
+                                        method_name = method_name))
+            sys.stderr.write(qm.common.format_traceback(exc_info))
+        except KeyboardInterrupt:
+            sys.stderr.write("\nqmtest: Interrupted.\n")
+            raise
+        except qm.platform.SignalException, se:
+            # SIGTERM indicates a request to shut down.  Other signals
+            # should be handled earlier.
+            #if se.GetSignalNumber() != signal.SIGTERM:
+            raise
+    finally:
+        # Collect garbage so that any "__del__" methods with externally
+        # visible side-effects are executed.
+        del qm.test.cmdline._the_qmtest
+        gc.collect()
+
+    # End the program.
+    sys.exit(exit_code)
+
