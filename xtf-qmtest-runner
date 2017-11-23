@@ -18,30 +18,59 @@ import qm
 if sys.platform != "win32":
     import qm.sigmask
 
-from   qm.test.cmdline import _the_qmtest
-from   qm.test.database import get_database, set_path
+import qm.test.base
+import qm.test.cmdline
+from   qm.test.database import set_path
+from   qm.test.result import Result
 
-class XTFQMTest(object):
+class XTFQMTest(qm.test.cmdline.QMTest):
     """XTF QMTest instalce"""
+
+    tag_option_spec = (
+        "F",
+        "filter",
+        "ARGUMENT=VALUE",
+        "Run only the tests for which the argument matches the VALUE tag.",
+    )
+
     def __init__(self, argument_list, path):
+        insert_option = lambda x,y: x[:4] + (x[4] + (y, ), ) + x[5:]
+        qm.test.cmdline.QMTest.commands_spec[:] = [
+            insert_option(x, self.tag_option_spec) if x[0] == "run" else x
+            for x in qm.test.cmdline.QMTest.commands_spec]
+        qm.test.cmdline.QMTest.__init__(self, argument_list, path)
 
-        global _the_qmtest
-        _the_qmtest = self
+    def Execute(self):
+        return qm.test.cmdline.QMTest.Execute(self)
 
-    def __call__(self):
-        return self._execute_run()
+    def _QMTest__FilterTestsToRun(self, test_ids, expectations):
+        """Return those tests from 'test_ids' that should be run.
 
-    def _execute_run(self):
-        """Executes the available tests"""
+        'test_ids' -- A sequence of test ids.
 
-        database = get_database()
+        'expectations' -- An ExpectationDatabase.
 
-        if database is None:
-            print "ERROR: No database found"
-            return 2
+        returns -- Those elements of 'test_names' that are not to be
+        skipped.  If 'a' precedes 'b' in 'test_ids', and both 'a' and
+        'b' are present in the result, 'a' will precede 'b' in the
+        result."""
 
-        print "OKAY"
-        return 0
+        # The --rerun option indicates that only failing tests should
+        # be rerun.
+        rerun_file_name = self.GetCommandOption("rerun")
+        if rerun_file_name:
+            # Load the outcomes from the file specified.
+            outcomes = qm.test.base.load_outcomes(rerun_file_name,
+                                          self.GetDatabase())
+            # Filter out tests that have unexpected outcomes.
+            test_ids = [t for t in test_ids
+                        if outcomes.get(t, Result.PASS)
+                        != expectations.Lookup(t).GetOutcome()]
+
+        #print qm.test.cmdline.QMTest.commands_spec
+
+        return test_ids
+
 
 ########################################################################
 # Functions
@@ -73,7 +102,7 @@ def main():
     command = XTFQMTest(sys.argv[1:], sys.argv[0])
 
     # Execute the command.
-    return command()
+    return command.Execute()
 
 if __name__ == "__main__":
     # Assume that something will go wrong.
@@ -84,7 +113,7 @@ if __name__ == "__main__":
         set_path(os.path.join(os.getcwd(), "qmtest"))
 
         # Set the program name.
-        qm.common.program_name = "QMTest"
+        qm.common.program_name = "XTFQMTest"
 
         # Load messages.
         qm.diagnostic.load_messages("test")
