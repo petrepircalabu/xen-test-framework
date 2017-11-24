@@ -9,5 +9,12 @@
   </argument>
   <argument name="conf_file">
     <text>tests/cpuid-faulting/test-hvm32-cpuid-faulting.cfg</text>
-  </argument>  
+  </argument>
+  <argument name="tags">
+    <set>
+      <text>hvm</text>
+      <text>hvm32</text>
+      <text>functional</text>
+    </set>
+  </argument>
 </extension>

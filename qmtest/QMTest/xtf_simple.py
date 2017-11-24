@@ -4,7 +4,7 @@
 ########################################################################
 import os.path
 
-from   qm.fields import TextField
+from   qm.fields import TextField, SetField
 from   qm.test.test import Test
 from   xl_domu import XLDomU
 from   xtf_utils import XTFError
@@ -20,7 +20,11 @@ class XTFSimpleTest(Test):
         TextField(
             name="conf_file",
             title="XL configuration file",
-        ),
+            ),
+        SetField(TextField(
+            name="tags",
+            title="test tags",
+            )),
     ]
 
     def Run(self, context, result):
