@@ -5,7 +5,9 @@
 
 import imp
 
+from   Queue import Queue, Empty
 from   subprocess import Popen, PIPE
+from   threading import Thread
 from   xen_domu import XENDomU
 from   xtf_utils import XTFError
 
@@ -54,6 +56,37 @@ def _xl_unpause(domid):
 
 class XLDomU(XENDomU):
     """XEN DomU implementation using the XL toolstack"""
+
+    class XLDomuConsole(object):
+        """XL Console wrapper class"""
+        def __init__(self, domid):
+            args = ['xl', 'console', str(domid) ]
+            self.io_q = Queue()
+            self.proc = Popen(args, stdout = PIPE, stderr = PIPE)
+            Thread(target=self.reader_fn, name="reader",
+                args=(self, self.proc.stdout,)).start()
+
+        def reader_fn(self, stream):
+            """Reader Thread"""
+            line = stream.readline()
+            while line:
+                self.io_q.put(line)
+                line = stream.readline()
+
+            if not stream.closed:
+                stream.close()
+
+        def wait(self):
+            """Print console output"""
+            while True:
+                try:
+                    item = self.io_q.get(True, 1)
+                except Empty:
+                    # No output in either streams for a second. Are we done?
+                    if self.proc.poll() is not None:
+                        break
+                else:
+                    print item
 
     def __init__(self, conf):
         super(XLDomU, self).__init__()
