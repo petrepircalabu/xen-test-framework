@@ -54,7 +54,7 @@ class XTFSimpleTest(Test):
             value, output = console.wait(pattern)
             if value is None:
                 value = "CRASH"
-            #domu.destroy()
+
             result.Annotate({"output": output})
 
             if value == 'SUCCESS':
@@ -70,14 +70,18 @@ class XTFSimpleTest(Test):
             e.Annotate(result)
             result.Fail("Error while executing test")
 
-        for _ in xrange(2):
+        # Cleanup
+        for _ in xrange(5):
             try:
                 domu.domname()
-
             except XTFError as er:
                 er.Annotate(result)
                 return
             else:
                 time.sleep(1)
-        # FIXME:
-        #domu.destroy()
+
+        try:
+            domu.destroy()
+        except XTFError as er:
+            # Ignore error
+            pass
