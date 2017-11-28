@@ -24,3 +24,11 @@ class XENDomU(object):
     def unpause(self):
         """Unpauses the domain"""
         raise NotImplementedError
+
+    def console(self):
+        """Returns the console handler for the domain"""
+        raise NotImplementedError
+
+    def domname(self):
+        """Returns the domain's name"""
+        raise NotImplementedError

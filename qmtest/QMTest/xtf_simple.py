@@ -3,9 +3,12 @@
 # Imports
 ########################################################################
 import os.path
+import re
+import time
 
 from   qm.fields import TextField, SetField
 from   qm.test.test import Test
+from   qm.test.result import Result
 from   xl_domu import XLDomU
 from   xtf_utils import XTFError
 
@@ -27,6 +30,8 @@ class XTFSimpleTest(Test):
             )),
     ]
 
+    all_results = ['SUCCESS', 'SKIP', 'ERROR', 'FAILURE', 'CRASH']
+
     def Run(self, context, result):
         """Run the test."""
 
@@ -43,7 +48,36 @@ class XTFSimpleTest(Test):
         try:
             domu = XLDomU(conf)
             domu.create()
-            domu.destroy()
+            console = domu.console()
+            domu.unpause()
+            pattern = re.compile('(?<=Test result: )({})'.format('|'.join(XTFSimpleTest.all_results)))
+            value, output = console.wait(pattern)
+            if value is None:
+                value = "CRASH"
+            #domu.destroy()
+            result.Annotate({"output": output})
+
+            if value == 'SUCCESS':
+                result.SetOutcome(Result.PASS)
+            elif value == 'SKIP':
+                result.SetOutcome(Result.UNTESTED)
+            elif value == 'FAILURE':
+                result.SetOutcome(Result.FAIL)
+            elif value == 'ERROR' or value == 'CRASH':
+                result.SetOutcome(Result.ERROR)
+
         except XTFError as e:
             e.Annotate(result)
             result.Fail("Error while executing test")
+
+        for _ in xrange(2):
+            try:
+                domu.domname()
+
+            except XTFError as er:
+                er.Annotate(result)
+                return
+            else:
+                time.sleep(1)
+        # FIXME:
+        #domu.destroy()

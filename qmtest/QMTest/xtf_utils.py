@@ -36,7 +36,7 @@ class XTFError(Exception):
             result.Annotate({label + "stdout" : result.Quote(self.__err_msg)})
 
 class XTFResult(object):
-
+    """XTFResult"""
     # All results of a test, keep in sync with C code report.h.
     # Notes:
     #  - WARNING is not a result on its own.
@@ -45,23 +45,9 @@ class XTFResult(object):
     all_results = ['SUCCESS', 'SKIP', 'ERROR', 'FAILURE', 'CRASH']
 
     def __init__(self, output, result):
-
         self.__result = result
         self.__output = output
-        value = self.__ParseXTFLog()
         self.__SetOutcome(value)
-
-    def __ParseXTFLog(self):
-        """ Interpret the final log line of a guest for a result """
-
-        if not "Test result:" in self.__output:
-            return "CRASH"
-
-        for res in self.all_results:
-            if res in self.__output:
-                return res
-
-        return "CRASH"
 
     def __SetOutcome(self, value):
         """ Set the outcome of the QMTest result """

@@ -4,6 +4,7 @@
 ########################################################################
 
 import imp
+import re
 
 from   Queue import Queue, Empty
 from   subprocess import Popen, PIPE
@@ -50,6 +51,14 @@ def _xl_unpause(domid):
     if ret:
         raise XTFError("_xl_unpause", ret, _, stderr)
 
+def _xl_domname(domid):
+    """Returns the domain name for the gived domid"""
+    args = ['xl', 'domname', str(domid)]
+    ret, _, stderr = _run_cmd(args)
+    if ret:
+        raise XTFError("_xl_domname", ret, _, stderr)
+    return _
+
 ########################################################################
 # Classes
 ########################################################################
@@ -64,7 +73,7 @@ class XLDomU(XENDomU):
             self.io_q = Queue()
             self.proc = Popen(args, stdout = PIPE, stderr = PIPE)
             Thread(target=self.reader_fn, name="reader",
-                args=(self, self.proc.stdout,)).start()
+                args=(self.proc.stdout,)).start()
 
         def reader_fn(self, stream):
             """Reader Thread"""
@@ -76,8 +85,9 @@ class XLDomU(XENDomU):
             if not stream.closed:
                 stream.close()
 
-        def wait(self):
+        def wait(self, pattern):
             """Print console output"""
+            output = ""
             while True:
                 try:
                     item = self.io_q.get(True, 1)
@@ -86,7 +96,11 @@ class XLDomU(XENDomU):
                     if self.proc.poll() is not None:
                         break
                 else:
-                    print item
+                    output = output + item
+                    match = re.search(pattern, item)
+                    if match is not None:
+                        return match.group(), output
+            return None, output
 
     def __init__(self, conf):
         super(XLDomU, self).__init__()
@@ -95,7 +109,7 @@ class XLDomU(XENDomU):
         code = open(conf)
         self.__config = imp.new_module(conf)
         exec code in self.__config.__dict__
-        self.console = None
+        self.__console = None
 
     def create(self):
         _xl_create(self.__xl_conf_file)
@@ -107,3 +121,11 @@ class XLDomU(XENDomU):
 
     def unpause(self):
         _xl_unpause(self.__dom_id)
+
+    def console(self):
+        if self.__console is None:
+            self.__console = XLDomU.XLDomuConsole(self.__dom_id)
+        return self.__console
+
+    def domname(self):
+        return _xl_domname(self.__dom_id)
