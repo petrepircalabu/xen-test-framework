@@ -46,36 +46,38 @@ class XTFSimpleTest(Test):
             return
 
         try:
+            # Set up the domain
             domu = XLDomU(conf)
             domu.create()
             console = domu.console()
+
+            # Start the domain
             domu.unpause()
             pattern = re.compile('(?<=Test result: )({})'.format('|'.join(XTFSimpleTest.all_results)))
             value, output = console.wait(pattern)
             if value is None:
                 value = "CRASH"
 
-            result.Annotate({"output": output})
-
-            if value == 'SUCCESS':
-                result.SetOutcome(Result.PASS)
-            elif value == 'SKIP':
-                result.SetOutcome(Result.UNTESTED)
-            elif value == 'FAILURE':
-                result.SetOutcome(Result.FAIL)
-            elif value == 'ERROR' or value == 'CRASH':
-                result.SetOutcome(Result.ERROR)
-
         except XTFError as e:
             e.Annotate(result)
             result.Fail("Error while executing test")
+
+        result.Annotate({"output": output})
+
+        if value == 'SUCCESS':
+            result.SetOutcome(Result.PASS)
+        elif value == 'SKIP':
+            result.SetOutcome(Result.UNTESTED)
+        elif value == 'FAILURE':
+            result.SetOutcome(Result.FAIL)
+        elif value == 'ERROR' or value == 'CRASH':
+            result.SetOutcome(Result.ERROR)
 
         # Cleanup
         for _ in xrange(5):
             try:
                 domu.domname()
             except XTFError as er:
-                er.Annotate(result)
                 return
             else:
                 time.sleep(1)
