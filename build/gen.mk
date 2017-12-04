@@ -27,12 +27,23 @@ else
 TEST-CFGS := $(foreach env,$(TEST-ENVS),test-$(env)-$(NAME).cfg)
 endif
 
+CLASS ?= "xtf.domu_test.DomuTestInfo"
+
 .PHONY: build
 build: $(foreach env,$(TEST-ENVS),test-$(env)-$(NAME)) $(TEST-CFGS)
 build: info.json
 
+MKINFO-OPTS := -n "$(NAME)"
+MKINFO-OPTS += -c "$(CLASS)"
+MKINFO-OPTS += -t "$(CATEGORY)"
+MKINFO-OPTS += -e "$(TEST-ENVS)"
+MKINFO-OPTS += -v "$(VARY-CFG)"
+ifneq (x$(TEST-EXTRA-INFO), x)
+MKINFO-OPTS += -x "$(TEST-EXTRA-INFO)"
+endif
+
 info.json: $(ROOT)/build/mkinfo.py FORCE
-	@$(PYTHON) $< $@.tmp "$(NAME)" "$(CATEGORY)" "$(TEST-ENVS)" "$(VARY-CFG)"
+	@$(PYTHON) $< $(MKINFO-OPTS) $@.tmp
 	@$(call move-if-changed,$@.tmp,$@)
 
 .PHONY: install install-each-env

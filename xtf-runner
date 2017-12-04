@@ -7,153 +7,29 @@ xtf-runner - A utility for enumerating and running XTF tests.
 Currently assumes the presence and availability of the `xl` toolstack.
 """
 
-import sys, os, os.path as path
+import os
+import sys
 
 from optparse import OptionParser
-from subprocess import Popen, PIPE, call as subproc_call
+from subprocess import Popen, PIPE
 
-try:
-    import json
-except ImportError:
-    import simplejson as json
-
-# All results of a test, keep in sync with C code report.h.
-# Notes:
-#  - WARNING is not a result on its own.
-#  - CRASH isn't known to the C code, but covers all cases where a valid
-#    result was not found.
-all_results = ['SUCCESS', 'SKIP', 'ERROR', 'FAILURE', 'CRASH']
+from xtf import default_categories, non_default_categories, all_categories
+from xtf import pv_environments, hvm_environments, all_environments
+from xtf.exceptions import RunnerError
+from xtf.logger import Logger
+from xtf.suite import get_all_test_info, gather_all_test_info
+from xtf.test import TestResult
 
 # Return the exit code for different states.  Avoid using 1 and 2 because
 # python interpreter uses them -- see document for sys.exit.
 def exit_code(state):
     """ Convert a test result to an xtf-runner exit code. """
-    return { "SUCCESS": 0,
-             "SKIP":    3,
-             "ERROR":   4,
-             "FAILURE": 5,
-             "CRASH":   6,
+    return { TestResult.SUCCESS: 0,
+             TestResult.SKIP:    3,
+             TestResult.ERROR:   4,
+             TestResult.FAILURE: 5,
+             TestResult.CRASH:   6,
     }[state]
-
-# All test categories
-default_categories     = set(("functional", "xsa"))
-non_default_categories = set(("special", "utility", "in-development"))
-all_categories         = default_categories | non_default_categories
-
-# All test environments
-pv_environments        = set(("pv64", "pv32pae"))
-hvm_environments       = set(("hvm64", "hvm32pae", "hvm32pse", "hvm32"))
-all_environments       = pv_environments | hvm_environments
-
-
-class RunnerError(Exception):
-    """ Errors relating to xtf-runner itself """
-
-class TestInstance(object):
-    """ Object representing a single test. """
-
-    def __init__(self, arg):
-        """ Parse and verify 'arg' as a test instance. """
-        self.env, self.name, self.variation = parse_test_instance_string(arg)
-
-        if self.env is None:
-            raise RunnerError("No environment for '%s'" % (arg, ))
-
-        if self.variation is None and get_all_test_info()[self.name].variations:
-            raise RunnerError("Test '%s' has variations, but none specified"
-                              % (self.name, ))
-
-    def vm_name(self):
-        """ Return the VM name as `xl` expects it. """
-        return repr(self)
-
-    def cfg_path(self):
-        """ Return the path to the `xl` config file for this test. """
-        return path.join("tests", self.name, repr(self) + ".cfg")
-
-    def __repr__(self):
-        if not self.variation:
-            return "test-%s-%s" % (self.env, self.name)
-        else:
-            return "test-%s-%s~%s" % (self.env, self.name, self.variation)
-
-    def __hash__(self):
-        return hash(repr(self))
-
-    def __cmp__(self, other):
-        return cmp(repr(self), repr(other))
-
-
-class TestInfo(object):
-    """ Object representing a tests info.json, in a more convenient form. """
-
-    def __init__(self, test_json):
-        """Parse and verify 'test_json'.
-
-        May raise KeyError, TypeError or ValueError.
-        """
-
-        name = test_json["name"]
-        if not isinstance(name, basestring):
-            raise TypeError("Expected string for 'name', got '%s'"
-                            % (type(name), ))
-        self.name = name
-
-        cat = test_json["category"]
-        if not isinstance(cat, basestring):
-            raise TypeError("Expected string for 'category', got '%s'"
-                            % (type(cat), ))
-        if not cat in all_categories:
-            raise ValueError("Unknown category '%s'" % (cat, ))
-        self.cat = cat
-
-        envs = test_json["environments"]
-        if not isinstance(envs, list):
-            raise TypeError("Expected list for 'environments', got '%s'"
-                            % (type(envs), ))
-        if not envs:
-            raise ValueError("Expected at least one environment")
-        for env in envs:
-            if not env in all_environments:
-                raise ValueError("Unknown environments '%s'" % (env, ))
-        self.envs = envs
-
-        variations = test_json["variations"]
-        if not isinstance(variations, list):
-            raise TypeError("Expected list for 'variations', got '%s'"
-                            % (type(variations), ))
-        self.variations = variations
-
-    def all_instances(self, env_filter = None, vary_filter = None):
-        """Return a list of TestInstances, for each supported environment.
-        Optionally filtered by env_filter.  May return an empty list if
-        the filter doesn't match any supported environment.
-        """
-
-        if env_filter:
-            envs = set(env_filter).intersection(self.envs)
-        else:
-            envs = self.envs
-
-        if vary_filter:
-            variations = set(vary_filter).intersection(self.variations)
-        else:
-            variations = self.variations
-
-        res = []
-        if variations:
-            for env in envs:
-                for vary in variations:
-                    res.append(TestInstance("test-%s-%s~%s"
-                                            % (env, self.name, vary)))
-        else:
-            res = [ TestInstance("test-%s-%s" % (env, self.name))
-                    for env in envs ]
-        return res
-
-    def __repr__(self):
-        return "TestInfo(%s)" % (self.name, )
-
 
 def parse_test_instance_string(arg):
     """Parse a test instance string.
@@ -220,47 +96,6 @@ def parse_test_instance_string(arg):
                               % (variation, name))
 
     return env, name, variation
-
-
-# Cached test json from disk
-_all_test_info = {}
-
-def get_all_test_info():
-    """ Open and collate each info.json """
-
-    # Short circuit if already cached
-    if _all_test_info:
-        return _all_test_info
-
-    for test in os.listdir("tests"):
-
-        info_file = None
-        try:
-
-            # Ignore directories which don't have a info.json inside them
-            try:
-                info_file = open(path.join("tests", test, "info.json"))
-            except IOError:
-                continue
-
-            # Ignore tests which have bad JSON
-            try:
-                test_info = TestInfo(json.load(info_file))
-
-                if test_info.name != test:
-                    continue
-
-            except (ValueError, KeyError, TypeError):
-                continue
-
-            _all_test_info[test] = test_info
-
-        finally:
-            if info_file:
-                info_file.close()
-
-    return _all_test_info
-
 
 def tests_from_selection(cats, envs, tests):
     """Given a selection of possible categories, environment and tests, return
@@ -433,136 +268,25 @@ def list_tests(opts):
     for sel in opts.selection:
         print sel
 
-
-def interpret_result(logline):
-    """ Interpret the final log line of a guest for a result """
-
-    if not "Test result:" in logline:
-        return "CRASH"
-
-    for res in all_results:
-        if res in logline:
-            return res
-
-    return "CRASH"
-
-
-def run_test_console(opts, test):
-    """ Run a specific, obtaining results via xenconsole """
-
-    cmd = ['xl', 'create', '-p', test.cfg_path()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    create = Popen(cmd, stdout = PIPE, stderr = PIPE)
-    _, stderr = create.communicate()
-
-    if create.returncode:
-        if opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-        print stderr
-        raise RunnerError("Failed to create VM")
-
-    cmd = ['xl', 'console', test.vm_name()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    console = Popen(cmd, stdout = PIPE)
-
-    cmd = ['xl', 'unpause', test.vm_name()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    rc = subproc_call(cmd)
-    if rc:
-        if opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-        raise RunnerError("Failed to unpause VM")
-
-    stdout, _ = console.communicate()
-
-    if console.returncode:
-        raise RunnerError("Failed to obtain VM console")
-
-    lines = stdout.splitlines()
-
-    if lines:
-        if not opts.quiet:
-            print "\n".join(lines)
-            print ""
-
-    else:
-        return "CRASH"
-
-    return interpret_result(lines[-1])
-
-
-def run_test_logfile(opts, test):
-    """ Run a specific test, obtaining results from a logfile """
-
-    logpath = path.join(opts.logfile_dir,
-                        opts.logfile_pattern.replace("%s", str(test)))
-
-    if not opts.quiet:
-        print "Using logfile '%s'" % (logpath, )
-
-    fd = os.open(logpath, os.O_CREAT | os.O_RDONLY, 0644)
-    logfile = os.fdopen(fd)
-    logfile.seek(0, os.SEEK_END)
-
-    cmd = ['xl', 'create', '-F', test.cfg_path()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    guest = Popen(cmd, stdout = PIPE, stderr = PIPE)
-
-    _, stderr = guest.communicate()
-
-    if guest.returncode:
-        if opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-        print stderr
-        raise RunnerError("Failed to run test")
-
-    line = ""
-    for line in logfile.readlines():
-
-        line = line.rstrip()
-        if not opts.quiet:
-            print line
-
-        if "Test result:" in line:
-            print ""
-            break
-
-    logfile.close()
-
-    return interpret_result(line)
-
-
 def run_tests(opts):
     """ Run tests """
 
     tests = opts.selection
-    if not len(tests):
+    if not tests:
         raise RunnerError("No tests to run")
 
-    run_test = { "console": run_test_console,
-                 "logfile": run_test_logfile,
-    }.get(opts.results_mode, None)
-
-    if run_test is None:
-        raise RunnerError("Unknown mode '%s'" % (opts.mode, ))
-
-    rc = all_results.index('SUCCESS')
+    rc = TestResult()
     results = []
 
     for test in tests:
+        res = TestResult()
+        test.set_up(opts, res)
+        if res == TestResult.SUCCESS:
+            test.run(res)
+        test.clean_up(res)
 
-        res = run_test(opts, test)
-        res_idx = all_results.index(res)
-        if res_idx > rc:
-            rc = res_idx
+        if res > rc:
+            rc = res
 
         results.append(res)
 
@@ -571,7 +295,7 @@ def run_tests(opts):
     for test, res in zip(tests, results):
         print "%-40s %s" % (test, res)
 
-    return exit_code(all_results[rc])
+    return exit_code(rc)
 
 
 def main():
@@ -581,7 +305,7 @@ def main():
     sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
 
     # Normalise $CWD to the directory this script is in
-    os.chdir(path.dirname(path.abspath(sys.argv[0])))
+    os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
     # Avoid wrapping the epilog text
     OptionParser.format_epilog = lambda self, formatter: self.epilog
@@ -715,12 +439,16 @@ def main():
     opts, args = parser.parse_args()
     opts.args = args
 
+    Logger().initialize(opts)
+
+    gather_all_test_info()
+
     opts.selection = interpret_selection(opts)
 
     if opts.list_tests:
         return list_tests(opts)
-    else:
-        return run_tests(opts)
+
+    return run_tests(opts)
 
 
 if __name__ == "__main__":
