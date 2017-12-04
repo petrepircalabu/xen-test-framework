@@ -12,10 +12,10 @@ import sys, os, os.path as path
 from optparse import OptionParser
 from subprocess import Popen, PIPE, call as subproc_call
 
-try:
-    import json
-except ImportError:
-    import simplejson as json
+from xtf import default_categories, non_default_categories, all_categories
+from xtf import pv_environments, hvm_environments, all_environments
+from xtf.exceptions import RunnerError
+from xtf.suite import get_all_test_info, gather_all_test_info
 
 # All results of a test, keep in sync with C code report.h.
 # Notes:
@@ -34,126 +34,6 @@ def exit_code(state):
              "FAILURE": 5,
              "CRASH":   6,
     }[state]
-
-# All test categories
-default_categories     = set(("functional", "xsa"))
-non_default_categories = set(("special", "utility", "in-development"))
-all_categories         = default_categories | non_default_categories
-
-# All test environments
-pv_environments        = set(("pv64", "pv32pae"))
-hvm_environments       = set(("hvm64", "hvm32pae", "hvm32pse", "hvm32"))
-all_environments       = pv_environments | hvm_environments
-
-
-class RunnerError(Exception):
-    """ Errors relating to xtf-runner itself """
-
-class TestInstance(object):
-    """ Object representing a single test. """
-
-    def __init__(self, arg):
-        """ Parse and verify 'arg' as a test instance. """
-        self.env, self.name, self.variation = parse_test_instance_string(arg)
-
-        if self.env is None:
-            raise RunnerError("No environment for '%s'" % (arg, ))
-
-        if self.variation is None and get_all_test_info()[self.name].variations:
-            raise RunnerError("Test '%s' has variations, but none specified"
-                              % (self.name, ))
-
-    def vm_name(self):
-        """ Return the VM name as `xl` expects it. """
-        return repr(self)
-
-    def cfg_path(self):
-        """ Return the path to the `xl` config file for this test. """
-        return path.join("tests", self.name, repr(self) + ".cfg")
-
-    def __repr__(self):
-        if not self.variation:
-            return "test-%s-%s" % (self.env, self.name)
-        else:
-            return "test-%s-%s~%s" % (self.env, self.name, self.variation)
-
-    def __hash__(self):
-        return hash(repr(self))
-
-    def __cmp__(self, other):
-        return cmp(repr(self), repr(other))
-
-
-class TestInfo(object):
-    """ Object representing a tests info.json, in a more convenient form. """
-
-    def __init__(self, test_json):
-        """Parse and verify 'test_json'.
-
-        May raise KeyError, TypeError or ValueError.
-        """
-
-        name = test_json["name"]
-        if not isinstance(name, basestring):
-            raise TypeError("Expected string for 'name', got '%s'"
-                            % (type(name), ))
-        self.name = name
-
-        cat = test_json["category"]
-        if not isinstance(cat, basestring):
-            raise TypeError("Expected string for 'category', got '%s'"
-                            % (type(cat), ))
-        if not cat in all_categories:
-            raise ValueError("Unknown category '%s'" % (cat, ))
-        self.cat = cat
-
-        envs = test_json["environments"]
-        if not isinstance(envs, list):
-            raise TypeError("Expected list for 'environments', got '%s'"
-                            % (type(envs), ))
-        if not envs:
-            raise ValueError("Expected at least one environment")
-        for env in envs:
-            if not env in all_environments:
-                raise ValueError("Unknown environments '%s'" % (env, ))
-        self.envs = envs
-
-        variations = test_json["variations"]
-        if not isinstance(variations, list):
-            raise TypeError("Expected list for 'variations', got '%s'"
-                            % (type(variations), ))
-        self.variations = variations
-
-    def all_instances(self, env_filter = None, vary_filter = None):
-        """Return a list of TestInstances, for each supported environment.
-        Optionally filtered by env_filter.  May return an empty list if
-        the filter doesn't match any supported environment.
-        """
-
-        if env_filter:
-            envs = set(env_filter).intersection(self.envs)
-        else:
-            envs = self.envs
-
-        if vary_filter:
-            variations = set(vary_filter).intersection(self.variations)
-        else:
-            variations = self.variations
-
-        res = []
-        if variations:
-            for env in envs:
-                for vary in variations:
-                    res.append(TestInstance("test-%s-%s~%s"
-                                            % (env, self.name, vary)))
-        else:
-            res = [ TestInstance("test-%s-%s" % (env, self.name))
-                    for env in envs ]
-        return res
-
-    def __repr__(self):
-        return "TestInfo(%s)" % (self.name, )
-
 
 def parse_test_instance_string(arg):
     """Parse a test instance string.
@@ -220,47 +100,6 @@ def parse_test_instance_string(arg):
                               % (variation, name))
 
     return env, name, variation
-
-
-# Cached test json from disk
-_all_test_info = {}
-
-def get_all_test_info():
-    """ Open and collate each info.json """
-
-    # Short circuit if already cached
-    if _all_test_info:
-        return _all_test_info
-
-    for test in os.listdir("tests"):
-
-        info_file = None
-        try:
-
-            # Ignore directories which don't have a info.json inside them
-            try:
-                info_file = open(path.join("tests", test, "info.json"))
-            except IOError:
-                continue
-
-            # Ignore tests which have bad JSON
-            try:
-                test_info = TestInfo(json.load(info_file))
-
-                if test_info.name != test:
-                    continue
-
-            except (ValueError, KeyError, TypeError):
-                continue
-
-            _all_test_info[test] = test_info
-
-        finally:
-            if info_file:
-                info_file.close()
-
-    return _all_test_info
-
 
 def tests_from_selection(cats, envs, tests):
     """Given a selection of possible categories, environment and tests, return
@@ -713,6 +552,8 @@ def main():
 
     opts, args = parser.parse_args()
     opts.args = args
+
+    gather_all_test_info()
 
     opts.selection = interpret_selection(opts)
 
