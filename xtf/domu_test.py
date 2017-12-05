@@ -4,34 +4,16 @@
 import os, os.path as path
 from subprocess import Popen, PIPE, call as subproc_call
 
-from xtf import all_categories
 from xtf import all_environments
 from xtf.exceptions import RunnerError
+from xtf.test import TestInstance, TestInfo
 
-# All results of a test, keep in sync with C code report.h.
-# Notes:
-#  - WARNING is not a result on its own.
-#  - CRASH isn't known to the C code, but covers all cases where a valid
-#    result was not found.
-all_results = ['SUCCESS', 'SKIP', 'ERROR', 'FAILURE', 'CRASH']
-
-def interpret_result(logline):
-    """ Interpret the final log line of a guest for a result """
-
-    if "Test result:" not in logline:
-        return "CRASH"
-
-    for res in all_results:
-        if res in logline:
-            return res
-
-    return "CRASH"
-
-
-class TestInstance(object):
-    """ Object representing a single test. """
+class DomuTestInstance(TestInstance):
+    """ Object representing a single DOMU test. """
 
     def __init__(self, env, name, variation, test_info):
+        super(DomuTestInstance, self).__init__()
+
         self.env, self.name, self.variation = env, name, variation
 
         if self.env is None:
@@ -119,7 +101,7 @@ class TestInstance(object):
         else:
             return "CRASH"
 
-        return interpret_result(lines[-1])
+        return TestInstance.interpret_result(lines[-1])
 
     def _run_test_logfile(self, opts):
         """ Run a specific test, obtaining results from a logfile """
@@ -161,9 +143,10 @@ class TestInstance(object):
 
         logfile.close()
 
-        return interpret_result(line)
+        return TestInstance.interpret_result(line)
 
-class TestInfo(object):
+
+class DomuTestInfo(TestInfo):
     """ Object representing a tests info.json, in a more convenient form. """
 
     def __init__(self, test_json):
@@ -172,19 +155,8 @@ class TestInfo(object):
         May raise KeyError, TypeError or ValueError.
         """
 
-        name = test_json["name"]
-        if not isinstance(name, basestring):
-            raise TypeError("Expected string for 'name', got '%s'"
-                            % (type(name), ))
-        self.name = name
-
-        cat = test_json["category"]
-        if not isinstance(cat, basestring):
-            raise TypeError("Expected string for 'category', got '%s'"
-                            % (type(cat), ))
-        if not cat in all_categories:
-            raise ValueError("Unknown category '%s'" % (cat, ))
-        self.cat = cat
+        super(DomuTestInfo, self).__init__(test_json)
+        self.instance_class = DomuTestInstance
 
         envs = test_json["environments"]
         if not isinstance(envs, list):
@@ -223,11 +195,11 @@ class TestInfo(object):
         if variations:
             for env in envs:
                 for vary in variations:
-                    res.append(TestInstance(env, self.name, vary, self))
+                    res.append(self.instance_class(env, self.name, vary, self))
         else:
-            res = [ TestInstance(env, self.name, None, self)
+            res = [ self.instance_class(env, self.name, None, self)
                     for env in envs ]
         return res
 
     def __repr__(self):
-        return "TestInfo(%s)" % (self.name, )
+        return "%s(%s)" % (self.__class__.__name__, self.name, )

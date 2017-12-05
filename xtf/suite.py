@@ -9,7 +9,7 @@ except ImportError:
     import simplejson as json
 
 from xtf.exceptions import RunnerError
-from xtf.domu_test import TestInfo
+from xtf.domu_test import DomuTestInfo
 
 # Cached test json from disk
 _all_test_info = {}
@@ -38,7 +38,7 @@ def gather_all_test_info():
 
             # Ignore tests which have bad JSON
             try:
-                test_info = TestInfo(json.load(info_file))
+                test_info = DomuTestInfo(json.load(info_file))
 
                 if test_info.name != test:
                     continue
