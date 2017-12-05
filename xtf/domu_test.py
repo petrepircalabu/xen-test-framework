@@ -1,11 +1,32 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os.path as path
+import os, os.path as path
+from subprocess import Popen, PIPE, call as subproc_call
 
 from xtf import all_categories
 from xtf import all_environments
 from xtf.exceptions import RunnerError
+
+# All results of a test, keep in sync with C code report.h.
+# Notes:
+#  - WARNING is not a result on its own.
+#  - CRASH isn't known to the C code, but covers all cases where a valid
+#    result was not found.
+all_results = ['SUCCESS', 'SKIP', 'ERROR', 'FAILURE', 'CRASH']
+
+def interpret_result(logline):
+    """ Interpret the final log line of a guest for a result """
+
+    if "Test result:" not in logline:
+        return "CRASH"
+
+    for res in all_results:
+        if res in logline:
+            return res
+
+    return "CRASH"
+
 
 class TestInstance(object):
     """ Object representing a single test. """
@@ -40,6 +61,107 @@ class TestInstance(object):
     def __cmp__(self, other):
         return cmp(repr(self), repr(other))
 
+    def run(self, opts):
+        """Executes the test instance"""
+        run_test = { "console": self._run_test_console,
+                     "logfile": self._run_test_logfile,
+        }.get(opts.results_mode, None)
+
+        if run_test is None:
+            raise RunnerError("Unknown mode '%s'" % (opts.mode, ))
+
+        return run_test(opts)
+
+    def _run_test_console(self, opts):
+        """ Run a specific, obtaining results via xenconsole """
+
+        cmd = ['xl', 'create', '-p', self.cfg_path()]
+        if not opts.quiet:
+            print "Executing '%s'" % (" ".join(cmd), )
+
+        create = Popen(cmd, stdout = PIPE, stderr = PIPE)
+        _, stderr = create.communicate()
+
+        if create.returncode:
+            if opts.quiet:
+                print "Executing '%s'" % (" ".join(cmd), )
+            print stderr
+            raise RunnerError("Failed to create VM")
+
+        cmd = ['xl', 'console', self.vm_name()]
+        if not opts.quiet:
+            print "Executing '%s'" % (" ".join(cmd), )
+
+        console = Popen(cmd, stdout = PIPE)
+
+        cmd = ['xl', 'unpause', self.vm_name()]
+        if not opts.quiet:
+            print "Executing '%s'" % (" ".join(cmd), )
+
+        rc = subproc_call(cmd)
+        if rc:
+            if opts.quiet:
+                print "Executing '%s'" % (" ".join(cmd), )
+            raise RunnerError("Failed to unpause VM")
+
+        stdout, _ = console.communicate()
+
+        if console.returncode:
+            raise RunnerError("Failed to obtain VM console")
+
+        lines = stdout.splitlines()
+
+        if lines:
+            if not opts.quiet:
+                print "\n".join(lines)
+                print ""
+
+        else:
+            return "CRASH"
+
+        return interpret_result(lines[-1])
+
+    def _run_test_logfile(self, opts):
+        """ Run a specific test, obtaining results from a logfile """
+
+        logpath = path.join(opts.logfile_dir,
+                            opts.logfile_pattern.replace("%s", str(self)))
+
+        if not opts.quiet:
+            print "Using logfile '%s'" % (logpath, )
+
+        fd = os.open(logpath, os.O_CREAT | os.O_RDONLY, 0644)
+        logfile = os.fdopen(fd)
+        logfile.seek(0, os.SEEK_END)
+
+        cmd = ['xl', 'create', '-F', self.cfg_path()]
+        if not opts.quiet:
+            print "Executing '%s'" % (" ".join(cmd), )
+
+        guest = Popen(cmd, stdout = PIPE, stderr = PIPE)
+
+        _, stderr = guest.communicate()
+
+        if guest.returncode:
+            if opts.quiet:
+                print "Executing '%s'" % (" ".join(cmd), )
+            print stderr
+            raise RunnerError("Failed to run test")
+
+        line = ""
+        for line in logfile.readlines():
+
+            line = line.rstrip()
+            if not opts.quiet:
+                print line
+
+            if "Test result:" in line:
+                print ""
+                break
+
+        logfile.close()
+
+        return interpret_result(line)
 
 class TestInfo(object):
     """ Object representing a tests info.json, in a more convenient form. """

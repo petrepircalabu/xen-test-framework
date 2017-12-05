@@ -10,7 +10,7 @@ Currently assumes the presence and availability of the `xl` toolstack.
 import sys, os, os.path as path
 
 from optparse import OptionParser
-from subprocess import Popen, PIPE, call as subproc_call
+from subprocess import Popen, PIPE
 
 from xtf import default_categories, non_default_categories, all_categories
 from xtf import pv_environments, hvm_environments, all_environments
@@ -271,113 +271,6 @@ def list_tests(opts):
     for sel in opts.selection:
         print sel
 
-
-def interpret_result(logline):
-    """ Interpret the final log line of a guest for a result """
-
-    if not "Test result:" in logline:
-        return "CRASH"
-
-    for res in all_results:
-        if res in logline:
-            return res
-
-    return "CRASH"
-
-
-def run_test_console(opts, test):
-    """ Run a specific, obtaining results via xenconsole """
-
-    cmd = ['xl', 'create', '-p', test.cfg_path()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    create = Popen(cmd, stdout = PIPE, stderr = PIPE)
-    _, stderr = create.communicate()
-
-    if create.returncode:
-        if opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-        print stderr
-        raise RunnerError("Failed to create VM")
-
-    cmd = ['xl', 'console', test.vm_name()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    console = Popen(cmd, stdout = PIPE)
-
-    cmd = ['xl', 'unpause', test.vm_name()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    rc = subproc_call(cmd)
-    if rc:
-        if opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-        raise RunnerError("Failed to unpause VM")
-
-    stdout, _ = console.communicate()
-
-    if console.returncode:
-        raise RunnerError("Failed to obtain VM console")
-
-    lines = stdout.splitlines()
-
-    if lines:
-        if not opts.quiet:
-            print "\n".join(lines)
-            print ""
-
-    else:
-        return "CRASH"
-
-    return interpret_result(lines[-1])
-
-
-def run_test_logfile(opts, test):
-    """ Run a specific test, obtaining results from a logfile """
-
-    logpath = path.join(opts.logfile_dir,
-                        opts.logfile_pattern.replace("%s", str(test)))
-
-    if not opts.quiet:
-        print "Using logfile '%s'" % (logpath, )
-
-    fd = os.open(logpath, os.O_CREAT | os.O_RDONLY, 0644)
-    logfile = os.fdopen(fd)
-    logfile.seek(0, os.SEEK_END)
-
-    cmd = ['xl', 'create', '-F', test.cfg_path()]
-    if not opts.quiet:
-        print "Executing '%s'" % (" ".join(cmd), )
-
-    guest = Popen(cmd, stdout = PIPE, stderr = PIPE)
-
-    _, stderr = guest.communicate()
-
-    if guest.returncode:
-        if opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-        print stderr
-        raise RunnerError("Failed to run test")
-
-    line = ""
-    for line in logfile.readlines():
-
-        line = line.rstrip()
-        if not opts.quiet:
-            print line
-
-        if "Test result:" in line:
-            print ""
-            break
-
-    logfile.close()
-
-    return interpret_result(line)
-
-
 def run_tests(opts):
     """ Run tests """
 
@@ -385,19 +278,12 @@ def run_tests(opts):
     if not len(tests):
         raise RunnerError("No tests to run")
 
-    run_test = { "console": run_test_console,
-                 "logfile": run_test_logfile,
-    }.get(opts.results_mode, None)
-
-    if run_test is None:
-        raise RunnerError("Unknown mode '%s'" % (opts.mode, ))
-
     rc = all_results.index('SUCCESS')
     results = []
 
     for test in tests:
 
-        res = run_test(opts, test)
+        res = test.run(opts)
         res_idx = all_results.index(res)
         if res_idx > rc:
             rc = res_idx
