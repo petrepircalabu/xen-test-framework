@@ -144,5 +144,5 @@ guest.
 
 @section index-monitor Monitor
 
-@subpage test-emul_unimplemented - @Test EMUL_UNIMPLEMENTED event generation
+@subpage test-emul-unimpl - @Test EMUL_UNIMPLEMENTED event generation
 */
