@@ -175,6 +175,12 @@ class DomuTestInfo(TestInfo):
                             % (type(variations), ))
         self.variations = variations
 
+        extra = test_json["extra"]
+        if not isinstance(extra, dict):
+            raise TypeError("Expected dict for 'extra', got '%s'"
+                            % (type(extra), ))
+        self.extra = extra
+
     def all_instances(self, env_filter = None, vary_filter = None):
         """Return a list of TestInstances, for each supported environment.
         Optionally filtered by env_filter.  May return an empty list if
