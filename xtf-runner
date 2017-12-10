@@ -16,6 +16,7 @@ from xtf import default_categories, non_default_categories, all_categories
 from xtf import pv_environments, hvm_environments, all_environments
 from xtf.exceptions import RunnerError
 from xtf.suite import get_all_test_info, gather_all_test_info
+from xtf.logger import Logger
 
 # All results of a test, keep in sync with C code report.h.
 # Notes:
@@ -438,6 +439,8 @@ def main():
 
     opts, args = parser.parse_args()
     opts.args = args
+
+    Logger().initialize(opts)
 
     gather_all_test_info()
 
