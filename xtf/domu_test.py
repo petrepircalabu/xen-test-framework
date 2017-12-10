@@ -2,11 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import os, os.path as path
-from subprocess import Popen, PIPE, call as subproc_call
+import time
+from subprocess import Popen, PIPE, call as subproc_cal
 
 from xtf import all_environments
 from xtf.exceptions import RunnerError
+from xtf.logger import Logger
 from xtf.test import TestInstance, TestInfo
+from xtf.xl_domu import XLDomU
 
 class DomuTestInstance(TestInstance):
     """ Object representing a single DOMU test. """
@@ -57,51 +60,20 @@ class DomuTestInstance(TestInstance):
     def _run_test_console(self, opts):
         """ Run a specific, obtaining results via xenconsole """
 
-        cmd = ['xl', 'create', '-p', self.cfg_path()]
-        if not opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
+        # set up the domain
+        domu = XLDomU(self.cfg_path())
+        domu.create()
+        console = domu.console()
 
-        create = Popen(cmd, stdout = PIPE, stderr = PIPE)
-        _, stderr = create.communicate()
+        # start the domain
+        domu.unpause()
+        value, _ = console.wait(self.result_pattern())
+        if value is None:
+            value = "CRASH"
 
-        if create.returncode:
-            if opts.quiet:
-                print "Executing '%s'" % (" ".join(cmd), )
-            print stderr
-            raise RunnerError("Failed to create VM")
+        Logger().log(_)
 
-        cmd = ['xl', 'console', self.vm_name()]
-        if not opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-
-        console = Popen(cmd, stdout = PIPE)
-
-        cmd = ['xl', 'unpause', self.vm_name()]
-        if not opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-
-        rc = subproc_call(cmd)
-        if rc:
-            if opts.quiet:
-                print "Executing '%s'" % (" ".join(cmd), )
-            raise RunnerError("Failed to unpause VM")
-
-        stdout, _ = console.communicate()
-
-        if console.returncode:
-            raise RunnerError("Failed to obtain VM console")
-
-        lines = stdout.splitlines()
-
-        if lines:
-            if not opts.quiet:
-                print "\n".join(lines)
-                print ""
-
-        else:
-            return "CRASH"
-
-        return TestInstance.interpret_result(lines[-1])
+        return value
 
     def _run_test_logfile(self, opts):
         """ Run a specific test, obtaining results from a logfile """
@@ -116,19 +88,17 @@ class DomuTestInstance(TestInstance):
         logfile = os.fdopen(fd)
         logfile.seek(0, os.SEEK_END)
 
-        cmd = ['xl', 'create', '-F', self.cfg_path()]
-        if not opts.quiet:
-            print "Executing '%s'" % (" ".join(cmd), )
-
-        guest = Popen(cmd, stdout = PIPE, stderr = PIPE)
-
-        _, stderr = guest.communicate()
-
-        if guest.returncode:
-            if opts.quiet:
-                print "Executing '%s'" % (" ".join(cmd), )
-            print stderr
-            raise RunnerError("Failed to run test")
+        domu = XLDomU(self.cfg_path())
+        domu.create()
+        domu.unpause()
+        # wait for completion
+        for _ in xrange(5):
+            try:
+                domu.domname()
+            except RunnerError:
+                break
+            else:
+                time.sleep(1)
 
         line = ""
         for line in logfile.readlines():
