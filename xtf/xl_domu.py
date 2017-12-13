@@ -5,6 +5,8 @@
 
 import imp
 import re
+import os.path
+import time
 
 from   Queue import Queue, Empty
 from   subprocess import Popen, PIPE
@@ -57,13 +59,12 @@ def _xl_unpause(domid):
     if ret:
         raise RunnerError("_xl_unpause", ret, _, stderr)
 
-def _xl_domname(domid):
-    """Returns the domain name for the gived domid"""
-    args = ['xl', 'domname', str(domid)]
-    ret, _, stderr = _run_cmd(args)
-    if ret:
-        raise RunnerError("_xl_domname", ret, _, stderr)
-    return _
+def _is_alive(domid):
+    """Checks if the domain is alive using xenstore."""
+    args = ['xenstore-exists', os.path.join("/local/domain/", str(domid))]
+    ret = _run_cmd(args)[0]
+    return ret != 0
+
 
 ########################################################################
 # Classes
@@ -121,10 +122,20 @@ class XLDomU(object):
         _xl_create(self.__xl_conf_file, paused, fg)
         self.dom_id = _xl_dom_id(self.__config.name)
 
-    def destroy(self):
+    def cleanup(self):
         """Destroys the domain."""
-        if self.dom_id != 0:
+
+        if self.dom_id == 0:
+            return
+
+        for _ in xrange(10):
+            if not _is_alive(self.dom_id):
+                return
+            time.sleep(1)
+
+        if _is_alive(self.dom_id):
             _xl_destroy(self.dom_id)
+            self.dom_id = 0
 
     def unpause(self):
         """Unpauses the domain."""
@@ -135,7 +146,3 @@ class XLDomU(object):
         if self.__console is None:
             self.__console = XLDomU.XLDomuConsole(self.dom_id)
         return self.__console
-
-    def domname(self):
-        """Returns the domain name"""
-        return _xl_domname(self.dom_id)
