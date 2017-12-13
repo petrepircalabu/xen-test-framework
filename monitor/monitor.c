@@ -221,6 +221,8 @@ int xtf_evtchn_loop(domid_t domain_id)
     if ( !evt )
         return -EINVAL;
 
+    printf("Monitor initialization complete.\n");
+
     for (;;)
     {
         rc = xtf_wait_for_event(domain_id, xtf_xch, evt->xce_handle, 100);

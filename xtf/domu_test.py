@@ -3,7 +3,6 @@
 
 import os, os.path as path
 import time
-from subprocess import Popen, PIPE, call as subproc_cal
 
 from xtf import all_environments
 from xtf.exceptions import RunnerError
@@ -46,6 +45,12 @@ class DomuTestInstance(TestInstance):
     def __cmp__(self, other):
         return cmp(repr(self), repr(other))
 
+    def _notify_domain_create(self):
+        """Called after the domain was created and before it is unpaused.
+           Returns false if some external dependencies failed.
+        """
+        return True
+
     def run(self, opts):
         """Executes the test instance"""
         run_test = { "console": self._run_test_console,
@@ -64,6 +69,9 @@ class DomuTestInstance(TestInstance):
         domu = XLDomU(self.cfg_path())
         domu.create()
         console = domu.console()
+
+        if not self._notify_domain_create():
+            return "ERROR"
 
         # start the domain
         domu.unpause()
@@ -90,6 +98,10 @@ class DomuTestInstance(TestInstance):
 
         domu = XLDomU(self.cfg_path())
         domu.create()
+
+        if not self._notify_domain_create():
+            return "ERROR"
+
         domu.unpause()
         # wait for completion
         for _ in xrange(5):
