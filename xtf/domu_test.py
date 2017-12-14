@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Basic DomU test
+Runs a domain and checks the output for a spcific pattern.
+"""
 
-import os, os.path as path
-import time
+import os
+import StringIO
 
 from xtf import all_environments
 from xtf.exceptions import RunnerError
@@ -31,7 +35,7 @@ class DomuTestInstance(TestInstance):
 
     def cfg_path(self):
         """ Return the path to the `xl` config file for this test. """
-        return path.join("tests", self.name, repr(self) + ".cfg")
+        return os.path.join("tests", self.name, repr(self) + ".cfg")
 
     def __repr__(self):
         if not self.variation:
@@ -62,27 +66,34 @@ class DomuTestInstance(TestInstance):
         # set up the domain
         domu = XLDomU(self.cfg_path())
         domu.create()
-        console = domu.console()
+
+        if not Logger().quiet:
+            output = StringIO.StringIO()
+        else:
+            output = None
+
+        console = domu.console(output)
 
         if not self._notify_domain_create():
             domu.cleanup(0)
+            output.close()
             return TestResult.error()
 
         # start the domain
         domu.unpause()
-        value, _ = console.wait(self.result_pattern())
-        if value is None:
-            value = "CRASH"
+        result = console.expect(self.result_pattern())
 
-        Logger().log(_)
+        if output is not None:
+            Logger().log(output.getvalue())
+            output.close()
 
-        return TestResult(value)
+        return TestResult(result)
 
     def _run_test_logfile(self, opts):
         """ Run a specific test, obtaining results from a logfile """
 
-        logpath = path.join(opts.logfile_dir,
-                            opts.logfile_pattern.replace("%s", str(self)))
+        logpath = os.path.join(opts.logfile_dir,
+                               opts.logfile_pattern.replace("%s", str(self)))
 
         if not opts.quiet:
             print "Using logfile '%s'" % (logpath, )
@@ -116,7 +127,7 @@ class DomuTestInstance(TestInstance):
 
         logfile.close()
 
-        return TestInstance.interpret_result(line)
+        return TestInstance.parse_result(line)
 
 
 class DomuTestInfo(TestInfo):
@@ -138,7 +149,7 @@ class DomuTestInfo(TestInfo):
         if not envs:
             raise ValueError("Expected at least one environment")
         for env in envs:
-            if not env in all_environments:
+            if env not in all_environments:
                 raise ValueError("Unknown environments '%s'" % (env, ))
         self.envs = envs
 

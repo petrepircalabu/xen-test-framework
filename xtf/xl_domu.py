@@ -7,13 +7,13 @@
 ########################################################################
 
 import imp
-import re
 import os.path
 import time
 
-from   Queue import Queue, Empty
 from   subprocess import Popen, PIPE
-from   threading import Thread
+
+import pexpect
+
 from   xtf.exceptions import RunnerError
 from   xtf.logger import Logger
 
@@ -76,41 +76,6 @@ def _is_alive(domid):
 class XLDomU(object):
     """XEN DomU implementation using the XL toolstack"""
 
-    class XLDomuConsole(object):
-        """XL Console wrapper class"""
-        def __init__(self, domid):
-            args = ['xl', 'console', str(domid) ]
-            self.io_q = Queue()
-            self.proc = Popen(args, stdout = PIPE, stderr = PIPE)
-            Thread(target=self.reader_fn, name="reader",
-                args=(self.proc.stdout,)).start()
-
-        def reader_fn(self, stream):
-            """Reader Thread"""
-            line = stream.readline()
-            while line:
-                self.io_q.put(line)
-                line = stream.readline()
-
-            if not stream.closed:
-                stream.close()
-
-        def wait(self, pattern):
-            """Print console output"""
-            output = ""
-            while True:
-                try:
-                    item = self.io_q.get(True, 1)
-                except Empty:
-                    if self.proc.poll() is not None:
-                        break
-                else:
-                    output = output + item
-                    match = re.search(pattern, item)
-                    if match is not None:
-                        return match.group(), output
-            return None, output
-
     def __init__(self, conf):
         super(XLDomU, self).__init__()
         self.__xl_conf_file = conf
@@ -144,8 +109,9 @@ class XLDomU(object):
         """Unpauses the domain."""
         _xl_unpause(self.dom_id)
 
-    def console(self):
+    def console(self, logfile=None):
         """Creates the domain_console handler."""
         if self.__console is None:
-            self.__console = XLDomU.XLDomuConsole(self.dom_id)
+            self.__console = pexpect.spawn('xl', ['console', str(self.dom_id)],
+                    logfile=logfile)
         return self.__console

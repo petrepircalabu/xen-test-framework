@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re
-from xtf import all_categories
+"""
+Base XTF Test Classess
+"""
+import pexpect
+from   xtf import all_categories
 
 class TestResult(object):
     """
@@ -79,7 +82,7 @@ class TestInstance(object):
     """Base class for a XTF Test Instance object"""
 
     @staticmethod
-    def interpret_result(logline):
+    def parse_result(logline):
         """ Interpret the final log line of a guest for a result """
 
         if "Test result:" not in logline:
@@ -93,9 +96,8 @@ class TestInstance(object):
 
     @staticmethod
     def result_pattern():
-        """Compiles the test result regex pattern."""
-        return re.compile('(?<=Test result: )({})'.format(
-            '|'.join(TestInstance.all_results)))
+        """the test result pattern."""
+        return ['Test result: ' + x for x in TestResult.all_results] + [pexpect.TIMEOUT, pexpect.EOF]
 
     def __init__(self):
         pass
@@ -130,7 +132,7 @@ class TestInfo(object):
         if not isinstance(cat, basestring):
             raise TypeError("Expected string for 'category', got '%s'"
                             % (type(cat), ))
-        if not cat in all_categories:
+        if cat not in all_categories:
             raise ValueError("Unknown category '%s'" % (cat, ))
         self.cat = cat
 
