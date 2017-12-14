@@ -39,12 +39,6 @@ class DomuTestInstance(TestInstance):
         else:
             return "test-%s-%s~%s" % (self.env, self.name, self.variation)
 
-    def __hash__(self):
-        return hash(repr(self))
-
-    def __cmp__(self, other):
-        return cmp(repr(self), repr(other))
-
     def _notify_domain_create(self):
         """Called after the domain was created and before it is unpaused.
            Returns false if some external dependencies failed.

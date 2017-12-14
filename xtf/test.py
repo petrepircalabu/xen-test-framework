@@ -35,6 +35,12 @@ class TestInstance(object):
     def __init__(self):
         pass
 
+    def __hash__(self):
+        return hash(repr(self))
+
+    def __cmp__(self, other):
+        return cmp(repr(self), repr(other))
+
     def run(self, opts):
         """Runs the Test Instance."""
         raise NotImplementedError
