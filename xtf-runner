@@ -15,25 +15,19 @@ from subprocess import Popen, PIPE
 from xtf import default_categories, non_default_categories, all_categories
 from xtf import pv_environments, hvm_environments, all_environments
 from xtf.exceptions import RunnerError
-from xtf.suite import get_all_test_info, gather_all_test_info
 from xtf.logger import Logger
-
-# All results of a test, keep in sync with C code report.h.
-# Notes:
-#  - WARNING is not a result on its own.
-#  - CRASH isn't known to the C code, but covers all cases where a valid
-#    result was not found.
-all_results = ['SUCCESS', 'SKIP', 'ERROR', 'FAILURE', 'CRASH']
+from xtf.suite import get_all_test_info, gather_all_test_info
+from xtf.test import TestResult
 
 # Return the exit code for different states.  Avoid using 1 and 2 because
 # python interpreter uses them -- see document for sys.exit.
 def exit_code(state):
     """ Convert a test result to an xtf-runner exit code. """
-    return { "SUCCESS": 0,
-             "SKIP":    3,
-             "ERROR":   4,
-             "FAILURE": 5,
-             "CRASH":   6,
+    return { TestResult.success(): 0,
+             TestResult.skip():    3,
+             TestResult.error():   4,
+             TestResult.fail():    5,
+             TestResult.crash():   6,
     }[state]
 
 def parse_test_instance_string(arg):
@@ -279,15 +273,15 @@ def run_tests(opts):
     if not len(tests):
         raise RunnerError("No tests to run")
 
-    rc = all_results.index('SUCCESS')
+    rc = TestResult()
     results = []
 
     for test in tests:
 
         res = test.run(opts)
-        res_idx = all_results.index(res)
-        if res_idx > rc:
-            rc = res_idx
+
+        if res > rc:
+            rc = res
 
         results.append(res)
 
@@ -296,7 +290,7 @@ def run_tests(opts):
     for test, res in zip(tests, results):
         print "%-40s %s" % (test, res)
 
-    return exit_code(all_results[rc])
+    return exit_code(rc)
 
 
 def main():

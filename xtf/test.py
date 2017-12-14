@@ -4,27 +4,92 @@
 import re
 from xtf import all_categories
 
+class TestResult(object):
+    """
+    Test result wrapper class
+    All results of a test, keep in sync with C code report.h.
+    Notes:
+     - WARNING is not a result on its own.
+     - CRASH isn't known to the C code, but covers all cases where a valid
+       result was not found.
+    """
+
+    SUCCESS = 'SUCCESS'
+    SKIP = 'SKIP'
+    ERROR = 'ERROR'
+    FAILURE = 'FAILURE'
+    CRASH = 'CRASH'
+
+    all_results = [SUCCESS, SKIP, ERROR, FAILURE, CRASH]
+
+    def __init__(self, value=SUCCESS):
+        """
+        The result can be initialized using both a string value or an index
+        if the index used is out-of-bounds the result will be initialized
+        to CRASH
+        """
+        if isinstance(value, (int, long)):
+            try:
+                self.value = TestResult.all_results[value]
+            except IndexError:
+                self.value = TestResult.CRASH
+        else:
+            if value in TestResult.all_results:
+                self.value = value
+            else:
+                self.value = TestResult.CRASH
+
+    def __cmp__(self, other):
+        assert isinstance(other, TestResult)
+        return cmp(TestResult.all_results.index(self.value),
+                   TestResult.all_results.index(other.value))
+
+    def __repr__(self):
+        return self.value
+
+    def __hash__(self):
+        return hash(repr(self))
+
+    @staticmethod
+    def success():
+        """Instantiates a SUCCESS test result."""
+        return TestResult(TestResult.SUCCESS)
+
+    @staticmethod
+    def skip():
+        """Instantiates a SKIP test result."""
+        return TestResult(TestResult.SKIP)
+
+    @staticmethod
+    def error():
+        """Instantiates a ERROR test result."""
+        return TestResult(TestResult.ERROR)
+
+    @staticmethod
+    def fail():
+        """Instantiates a FAILURE test result."""
+        return TestResult(TestResult.FAILURE)
+
+    @staticmethod
+    def crash():
+        """Instantiates a CRASH test result."""
+        return TestResult(TestResult.CRASH)
+
 class TestInstance(object):
     """Base class for a XTF Test Instance object"""
-    # All results of a test, keep in sync with C code report.h.
-    # Notes:
-    #  - WARNING is not a result on its own.
-    #  - CRASH isn't known to the C code, but covers all cases where a valid
-    #    result was not found.
-    all_results = ['SUCCESS', 'SKIP', 'ERROR', 'FAILURE', 'CRASH']
 
     @staticmethod
     def interpret_result(logline):
         """ Interpret the final log line of a guest for a result """
 
         if "Test result:" not in logline:
-            return "CRASH"
+            return TestResult.crash()
 
-        for res in TestInstance.all_results:
+        for res in TestResult.all_results:
             if res in logline:
-                return res
+                return TestResult(res)
 
-        return "CRASH"
+        return TestResult.crash()
 
     @staticmethod
     def result_pattern():

@@ -12,7 +12,7 @@ from subprocess import Popen, PIPE
 from xtf.exceptions import RunnerError
 from xtf.domu_test import DomuTestInstance, DomuTestInfo
 from xtf.logger import Logger
-from xtf.test import TestInstance
+from xtf.test import TestResult
 from xtf.xl_domu import XLDomU
 
 class MonitorTestInstance(DomuTestInstance):
@@ -58,7 +58,7 @@ class MonitorTestInstance(DomuTestInstance):
 
         Logger().log(_)
 
-        return value
+        return TestResult(value)
 
 class MonitorTestInfo(DomuTestInfo):
     """Monitor test info"""

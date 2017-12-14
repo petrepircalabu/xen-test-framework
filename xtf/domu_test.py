@@ -7,7 +7,7 @@ import time
 from xtf import all_environments
 from xtf.exceptions import RunnerError
 from xtf.logger import Logger
-from xtf.test import TestInstance, TestInfo
+from xtf.test import TestInstance, TestInfo, TestResult
 from xtf.xl_domu import XLDomU
 
 class DomuTestInstance(TestInstance):
@@ -66,7 +66,7 @@ class DomuTestInstance(TestInstance):
 
         if not self._notify_domain_create():
             domu.cleanup(0)
-            return "ERROR"
+            return TestResult.error()
 
         # start the domain
         domu.unpause()
@@ -76,7 +76,7 @@ class DomuTestInstance(TestInstance):
 
         Logger().log(_)
 
-        return value
+        return TestResult(value)
 
     def _run_test_logfile(self, opts):
         """ Run a specific test, obtaining results from a logfile """
@@ -96,7 +96,7 @@ class DomuTestInstance(TestInstance):
 
         if not self._notify_domain_create():
             domu.cleanup(0)
-            return "ERROR"
+            return TestResult.error()
 
         domu.unpause()
         # wait for completion
