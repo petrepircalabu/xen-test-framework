@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """XL DomU class"""
 ########################################################################
 # Imports
@@ -122,13 +125,13 @@ class XLDomU(object):
         _xl_create(self.__xl_conf_file, paused, fg)
         self.dom_id = _xl_dom_id(self.__config.name)
 
-    def cleanup(self):
+    def cleanup(self, timeout=10):
         """Destroys the domain."""
 
         if self.dom_id == 0:
             return
 
-        for _ in xrange(10):
+        for _ in xrange(timeout):
             if not _is_alive(self.dom_id):
                 return
             time.sleep(1)

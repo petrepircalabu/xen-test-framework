@@ -71,6 +71,7 @@ class DomuTestInstance(TestInstance):
         console = domu.console()
 
         if not self._notify_domain_create():
+            domu.cleanup(0)
             return "ERROR"
 
         # start the domain
@@ -100,6 +101,7 @@ class DomuTestInstance(TestInstance):
         domu.create()
 
         if not self._notify_domain_create():
+            domu.cleanup(0)
             return "ERROR"
 
         domu.unpause()
