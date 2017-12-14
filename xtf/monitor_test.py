@@ -7,13 +7,15 @@
 """
 
 import os.path as path
-from subprocess import Popen, PIPE
+from   subprocess import Popen
 
-from xtf.exceptions import RunnerError
-from xtf.domu_test import DomuTestInstance, DomuTestInfo
-from xtf.logger import Logger
-from xtf.test import TestResult
-from xtf.xl_domu import XLDomU
+import StringIO
+
+from   xtf.exceptions import RunnerError
+from   xtf.domu_test import DomuTestInstance, DomuTestInfo
+from   xtf.logger import Logger
+from   xtf.test import TestResult
+from   xtf.xl_domu import XLDomU
 
 class MonitorTestInstance(DomuTestInstance):
     """Monitor test instance"""
@@ -44,21 +46,28 @@ class MonitorTestInstance(DomuTestInstance):
         # set up the domain
         domu = XLDomU(self.cfg_path())
         domu.create()
-        console = domu.console()
+
+        if not Logger().quiet:
+            output = StringIO.StringIO()
+        else:
+            output = None
+
+        console = domu.console(output)
 
         # start the monitor & domain
         monitor = self.start_monitor(domu.dom_id)
+
         # domu.unpause()
-        value, _ = console.wait(self.result_pattern())
-        if value is None:
-            value = "CRASH"
+        result = console.expect(self.result_pattern())
 
         if monitor.returncode:
             raise RunnerError("Failed to start monitor application")
 
-        Logger().log(_)
+        if output is not None:
+            Logger().log(output.getvalue())
+            output.close()
 
-        return TestResult(value)
+        return TestResult(result)
 
 class MonitorTestInfo(DomuTestInfo):
     """Monitor test info"""
