@@ -99,14 +99,9 @@ class DomuTestInstance(TestInstance):
             return TestResult.error()
 
         domu.unpause()
+
         # wait for completion
-        for _ in xrange(5):
-            try:
-                domu.domname()
-            except RunnerError:
-                break
-            else:
-                time.sleep(1)
+        domu.cleanup()
 
         line = ""
         for line in logfile.readlines():
