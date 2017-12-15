@@ -108,7 +108,7 @@ class DomuTestInstance(TestInstance):
 
         if not self._notify_domain_create():
             domu.cleanup(0)
-            result.set(estResult.ERROR)
+            result.set(TestResult.ERROR)
             return
 
         domu.unpause()
