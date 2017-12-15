@@ -42,7 +42,7 @@ class MonitorTestInstance(DomuTestInstance):
         Logger().log("Executing '%s'" % (" ".join(cmd), ))
         return Popen(cmd, shell=True)
 
-    def run(self, opts):
+    def run(self, opts, result):
         # set up the domain
         domu = XLDomU(self.cfg_path())
         domu.create()
@@ -58,7 +58,7 @@ class MonitorTestInstance(DomuTestInstance):
         monitor = self.start_monitor(domu.dom_id)
 
         # domu.unpause()
-        result = console.expect(self.result_pattern())
+        value = console.expect(self.result_pattern())
 
         if monitor.returncode:
             raise RunnerError("Failed to start monitor application")
@@ -67,7 +67,7 @@ class MonitorTestInstance(DomuTestInstance):
             Logger().log(output.getvalue())
             output.close()
 
-        return TestResult(result)
+        result.set(value)
 
 class MonitorTestInfo(DomuTestInfo):
     """Monitor test info"""

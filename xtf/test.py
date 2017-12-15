@@ -93,7 +93,7 @@ class TestInstance(object):
     def __cmp__(self, other):
         return cmp(repr(self), repr(other))
 
-    def run(self, opts):
+    def run(self, opts, result):
         """Runs the Test Instance."""
         raise NotImplementedError
 

@@ -49,7 +49,7 @@ class DomuTestInstance(TestInstance):
         """
         return True
 
-    def run(self, opts):
+    def run(self, opts, result):
         """Executes the test instance"""
         run_test = { "console": self._run_test_console,
                      "logfile": self._run_test_logfile,
@@ -58,9 +58,9 @@ class DomuTestInstance(TestInstance):
         if run_test is None:
             raise RunnerError("Unknown mode '%s'" % (opts.mode, ))
 
-        return run_test(opts)
+        run_test(opts, result)
 
-    def _run_test_console(self, opts):
+    def _run_test_console(self, opts, result):
         """ Run a specific, obtaining results via xenconsole """
 
         # set up the domain
@@ -77,19 +77,20 @@ class DomuTestInstance(TestInstance):
         if not self._notify_domain_create():
             domu.cleanup(0)
             output.close()
-            return TestResult(TestResult.ERROR)
+            result.set(TestResult.ERROR)
+            return
 
         # start the domain
         domu.unpause()
-        result = console.expect(self.result_pattern())
+        value = console.expect(self.result_pattern())
 
         if output is not None:
             Logger().log(output.getvalue())
             output.close()
 
-        return TestResult(result)
+        result.set(value)
 
-    def _run_test_logfile(self, opts):
+    def _run_test_logfile(self, opts, result):
         """ Run a specific test, obtaining results from a logfile """
 
         logpath = os.path.join(opts.logfile_dir,
@@ -107,7 +108,8 @@ class DomuTestInstance(TestInstance):
 
         if not self._notify_domain_create():
             domu.cleanup(0)
-            return TestResult(TestResult.ERROR)
+            result.set(estResult.ERROR)
+            return
 
         domu.unpause()
 
@@ -127,7 +129,7 @@ class DomuTestInstance(TestInstance):
 
         logfile.close()
 
-        return TestResult(TestInstance.parse_result(line))
+        result.set(TestInstance.parse_result(line))
 
 
 class DomuTestInfo(TestInfo):

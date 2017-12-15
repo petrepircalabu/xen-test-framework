@@ -277,8 +277,8 @@ def run_tests(opts):
     results = []
 
     for test in tests:
-
-        res = test.run(opts)
+        res = TestResult()
+        test.run(opts, res)
 
         if res > rc:
             rc = res
