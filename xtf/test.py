@@ -26,57 +26,42 @@ class TestResult(object):
     all_results = [SUCCESS, SKIP, ERROR, FAILURE, CRASH]
 
     def __init__(self, value=SUCCESS):
+        self.set(value)
+
+    def __cmp__(self, other):
+        if isinstance(other, TestResult):
+            return cmp(TestResult.all_results.index(self._value),
+                   TestResult.all_results.index(repr(other)))
+        elif isinstance(other, str):
+            if other in TestResult.all_results:
+                return cmp(TestResult.all_results.index(self._value),
+                       TestResult.all_results.index(other))
+
+        raise ValueError
+
+
+    def __repr__(self):
+        return self._value
+
+    def __hash__(self):
+        return hash(repr(self))
+
+    def set(self, value):
         """
-        The result can be initialized using both a string value or an index
+        The result can be set using both a string value or an index
         if the index used is out-of-bounds the result will be initialized
         to CRASH
         """
         if isinstance(value, (int, long)):
             try:
-                self.value = TestResult.all_results[value]
+                self._value = TestResult.all_results[value]
             except IndexError:
-                self.value = TestResult.CRASH
+                self._value = TestResult.CRASH
         else:
             if value in TestResult.all_results:
-                self.value = value
+                self._value = value
             else:
-                self.value = TestResult.CRASH
-
-    def __cmp__(self, other):
-        assert isinstance(other, TestResult)
-        return cmp(TestResult.all_results.index(self.value),
-                   TestResult.all_results.index(other.value))
-
-    def __repr__(self):
-        return self.value
-
-    def __hash__(self):
-        return hash(repr(self))
-
-    @staticmethod
-    def success():
-        """Instantiates a SUCCESS test result."""
-        return TestResult(TestResult.SUCCESS)
-
-    @staticmethod
-    def skip():
-        """Instantiates a SKIP test result."""
-        return TestResult(TestResult.SKIP)
-
-    @staticmethod
-    def error():
-        """Instantiates a ERROR test result."""
-        return TestResult(TestResult.ERROR)
-
-    @staticmethod
-    def fail():
-        """Instantiates a FAILURE test result."""
-        return TestResult(TestResult.FAILURE)
-
-    @staticmethod
-    def crash():
-        """Instantiates a CRASH test result."""
-        return TestResult(TestResult.CRASH)
+                self._value = TestResult.CRASH
 
 class TestInstance(object):
     """Base class for a XTF Test Instance object"""
@@ -86,13 +71,13 @@ class TestInstance(object):
         """ Interpret the final log line of a guest for a result """
 
         if "Test result:" not in logline:
-            return TestResult.crash()
+            return TestResult.CRASH
 
         for res in TestResult.all_results:
             if res in logline:
-                return TestResult(res)
+                return res
 
-        return TestResult.crash()
+        return TestResult.CRASH
 
     @staticmethod
     def result_pattern():

@@ -23,11 +23,11 @@ from xtf.test import TestResult
 # python interpreter uses them -- see document for sys.exit.
 def exit_code(state):
     """ Convert a test result to an xtf-runner exit code. """
-    return { TestResult.success(): 0,
-             TestResult.skip():    3,
-             TestResult.error():   4,
-             TestResult.fail():    5,
-             TestResult.crash():   6,
+    return { TestResult.SUCCESS: 0,
+             TestResult.SKIP:    3,
+             TestResult.ERROR:   4,
+             TestResult.FAILURE: 5,
+             TestResult.CRASH:   6,
     }[state]
 
 def parse_test_instance_string(arg):

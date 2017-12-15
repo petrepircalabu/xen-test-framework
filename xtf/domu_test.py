@@ -77,7 +77,7 @@ class DomuTestInstance(TestInstance):
         if not self._notify_domain_create():
             domu.cleanup(0)
             output.close()
-            return TestResult.error()
+            return TestResult(TestResult.ERROR)
 
         # start the domain
         domu.unpause()
@@ -107,7 +107,7 @@ class DomuTestInstance(TestInstance):
 
         if not self._notify_domain_create():
             domu.cleanup(0)
-            return TestResult.error()
+            return TestResult(TestResult.ERROR)
 
         domu.unpause()
 
@@ -127,7 +127,7 @@ class DomuTestInstance(TestInstance):
 
         logfile.close()
 
-        return TestInstance.parse_result(line)
+        return TestResult(TestInstance.parse_result(line))
 
 
 class DomuTestInfo(TestInfo):
