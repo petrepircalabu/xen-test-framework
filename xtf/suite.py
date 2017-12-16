@@ -75,7 +75,10 @@ def gather_all_test_info():
             try:
                 info_file = open(path.join("tests", test, "info.json"))
             except IOError:
-                continue
+                try:
+                    info_file = open(path.join("tests", test, "host.json"))
+                except IOError:
+                    continue
 
             # Ignore tests which have bad JSON
             try:

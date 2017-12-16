@@ -3,7 +3,7 @@
 
 # All test categories
 default_categories     = set(("functional", "xsa"))
-non_default_categories = set(("special", "utility", "in-development", "monitor"))
+non_default_categories = set(("special", "utility", "in-development", "monitor", "host"))
 all_categories         = default_categories | non_default_categories
 
 # All test environments
