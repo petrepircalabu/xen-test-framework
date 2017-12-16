@@ -18,9 +18,9 @@ class DomuTestInstance(TestInstance):
     """ Object representing a single DOMU test. """
 
     def __init__(self, env, name, variation, test_info):
-        super(DomuTestInstance, self).__init__()
+        super(DomuTestInstance, self).__init__(name)
 
-        self.env, self.name, self.variation = env, name, variation
+        self.env, self.variation = env, variation
 
         if self.env is None:
             raise RunnerError("No environment for '%s'" % (self.name, ))

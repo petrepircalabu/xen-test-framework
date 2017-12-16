@@ -32,7 +32,7 @@ class TestResult(object):
         if isinstance(other, TestResult):
             return cmp(TestResult.all_results.index(self._value),
                    TestResult.all_results.index(repr(other)))
-        elif isinstance(other, str):
+        elif isinstance(other, (str, unicode)):
             if other in TestResult.all_results:
                 return cmp(TestResult.all_results.index(self._value),
                        TestResult.all_results.index(other))
@@ -84,8 +84,8 @@ class TestInstance(object):
         """the test result pattern."""
         return ['Test result: ' + x for x in TestResult.all_results] + [pexpect.TIMEOUT, pexpect.EOF]
 
-    def __init__(self):
-        pass
+    def __init__(self, name):
+        self.name = name
 
     def __hash__(self):
         return hash(repr(self))

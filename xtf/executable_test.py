@@ -14,9 +14,9 @@ from   xtf.test import TestInstance, TestInfo, TestResult
 class ExecutableTestInstance(TestInstance):
     """Executable Test Instance"""
     def __init__(self, name, cmd, args, pattern):
-        super(ExecutableTestInstance, self).__init__()
+        super(ExecutableTestInstance, self).__init__(name)
 
-        self.name, self._cmd = name, cmd
+        self._cmd = cmd
         self._args = [x.encode('utf-8') for x in args]
         self._pattern = [x.encode('utf-8') for x in pattern]
         self._proc = None
