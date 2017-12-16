@@ -39,7 +39,6 @@ class TestResult(object):
 
         raise ValueError
 
-
     def __repr__(self):
         return self._value
 
@@ -62,6 +61,7 @@ class TestResult(object):
                 self._value = value
             else:
                 self._value = TestResult.CRASH
+
 
 class TestInstance(object):
     """Base class for a XTF Test Instance object"""
@@ -96,6 +96,7 @@ class TestInstance(object):
     def run(self, opts, result):
         """Runs the Test Instance."""
         raise NotImplementedError
+
 
 class TestInfo(object):
     """Base class for a XTF Test Info object.
