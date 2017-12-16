@@ -1,0 +1,12 @@
+{
+    "category": "host",
+    "name": "mock_host_test",
+    "class_name": "xtf.executable_test.ExecutableTestInfo",
+    "cmd" : "echo",
+    "args": [
+        "Gogu este liber"
+    ],
+    "pattern": [
+        "Vasile"
+    ]
+}
