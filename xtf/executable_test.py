@@ -28,9 +28,9 @@ class ExecutableTestInstance(TestInstance):
     def __repr__(self):
         return "test-%s-%s" %(self.env, self.name)
 
-    def wait_pattern(self, pattern, value):
+    def wait_pattern(self, pattern):
         """Expect the pattern given as parameter."""
-        value = self._proc.expect(pattern + [pexpect.TIMEOUT, pexpect.EOF])
+        return self._proc.expect(pattern + [pexpect.TIMEOUT, pexpect.EOF])
 
     def set_up(self, opts, result):
         self._proc = pexpect.spawn(self._cmd, self._args, logfile = self.output)
@@ -41,12 +41,10 @@ class ExecutableTestInstance(TestInstance):
 
     def run(self, result):
         """Executes the test instance"""
-        value = 0
-        self.wait_pattern(self._pattern, value)
-
-        if value >= len(pattern):
+        if self.wait_pattern(self._pattern) > len(self._pattern):
             result.set(TestResult.FAILURE)
             return
+
         result.set(TestResult.SUCCESS)
 
     def clean_up(self, result):

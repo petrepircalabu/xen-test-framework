@@ -7,7 +7,6 @@
 """
 
 import os
-import threading
 from   subprocess import Popen
 
 from   xtf.exceptions import RunnerError
@@ -15,6 +14,7 @@ from   xtf.domu_test import DomuTestInstance, DomuTestInfo
 from   xtf.executable_test import ExecutableTestInstance
 from   xtf.logger import Logger
 from   xtf.test import TestResult, TestInstance
+from   xtf.utils import XTFAsyncCall
 
 class MonitorTestInstance(TestInstance):
     """Monitor test instance"""
@@ -71,28 +71,23 @@ class MonitorTestInstance(TestInstance):
         self.monitor_test = ExecutableTestInstance(self.name, '/bin/sh',
                                                    ['-c', monitor_cmd], "")
         self.monitor_test.set_up(opts, result)
-        self.monitor_test.wait_pattern(['Monitor initialization complete.'],
-                                       result)
+        match = self.monitor_test.wait_pattern(['Monitor initialization complete.'])
+        if match != 0:
+            result.set(TestResult.CRASH)
 
     def run(self, result):
-        r1 = TestResult()
-        r2 = TestResult()
-        value = 0
-
-        t1 = threading.Thread(target=self.domu_test.run, args=(r1,))
-        t2 = threading.Thread(target=self.monitor_test.wait_pattern,
-                args=(self.result_pattern(), value))
+        t1 = XTFAsyncCall(target=self.domu_test.run, args=(result,))
+        t2 = XTFAsyncCall(target=self.monitor_test.wait_pattern,
+                args=(self.result_pattern(), ))
 
         for th in (t1, t2):
             th.start()
 
-        for th in (t1, t2):
-            th.join()
+        t1.join()
+        res = TestResult(t2.join())
+        if res > result:
+            result.set(str(res))
 
-        r2.set(value)
-
-        print r1
-        print r2
 
     def clean_up(self, result):
         if self.domu_test:
