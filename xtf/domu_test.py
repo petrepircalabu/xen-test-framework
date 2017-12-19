@@ -17,7 +17,7 @@ from xtf.xl_domu import XLDomU
 class DomuTestInstance(TestInstance):
     """ Object representing a single DOMU test. """
 
-    def __init__(self, env, name, variation, test_info):
+    def __init__(self, env, name, variation):
         super(DomuTestInstance, self).__init__(name)
 
         self.env, self.variation = env, variation
@@ -25,9 +25,13 @@ class DomuTestInstance(TestInstance):
         if self.env is None:
             raise RunnerError("No environment for '%s'" % (self.name, ))
 
-        if self.variation is None and test_info.variations:
-            raise RunnerError("Test '%s' has variations, but none specified"
-                              % (self.name, ))
+        self.domu = XLDomU(self.cfg_path())
+        self.results_mode = 'console'
+        self.logpath = None
+        if not Logger().quiet:
+            self.output = StringIO.StringIO()
+        else:
+            self.output = None
 
     def vm_name(self):
         """ Return the VM name as `xl` expects it. """
@@ -38,90 +42,68 @@ class DomuTestInstance(TestInstance):
         return os.path.join("tests", self.name, repr(self) + ".cfg")
 
     def __repr__(self):
-        if not self.variation:
-            return "test-%s-%s" % (self.env, self.name)
-        else:
+        if self.variation:
             return "test-%s-%s~%s" % (self.env, self.name, self.variation)
+        return "test-%s-%s" % (self.env, self.name)
 
-    def _notify_domain_create(self):
-        """Called after the domain was created and before it is unpaused.
-           Returns false if some external dependencies failed.
-        """
-        return True
+    def set_up(self, opts, result):
+        self.results_mode = opts.results_mode
+        if self.results_mode not in ['console', 'logfile']:
+            raise RunnerError("Unknown mode '%s'" % (opts.results_mode, ))
 
-    def run(self, opts, result):
+        self.logpath = os.path.join(opts.logfile_dir,
+                          opts.logfile_pattern.replace("%s", str(self)))
+        self.domu.create()
+
+    def run(self, result):
         """Executes the test instance"""
         run_test = { "console": self._run_test_console,
                      "logfile": self._run_test_logfile,
-        }.get(opts.results_mode, None)
+        }.get(self.results_mode, None)
 
-        if run_test is None:
-            raise RunnerError("Unknown mode '%s'" % (opts.mode, ))
+        run_test(result)
 
-        run_test(opts, result)
+    def clean_up(self, result):
+        if self.output:
+            self.output.close()
 
-    def _run_test_console(self, opts, result):
+        # wait for completion
+        if not self.domu.cleanup():
+            result.set(TestResult.CRASH)
+
+    def _run_test_console(self, result):
         """ Run a specific, obtaining results via xenconsole """
 
-        # set up the domain
-        domu = XLDomU(self.cfg_path())
-        domu.create()
-
-        if not Logger().quiet:
-            output = StringIO.StringIO()
-        else:
-            output = None
-
-        console = domu.console(output)
-
-        if not self._notify_domain_create():
-            domu.cleanup(0)
-            output.close()
-            result.set(TestResult.ERROR)
-            return
+        console = self.domu.console(self.output)
 
         # start the domain
-        domu.unpause()
+        self.domu.unpause()
         value = console.expect(self.result_pattern())
 
-        if output is not None:
-            Logger().log(output.getvalue())
-            output.close()
+        if self.output is not None:
+            Logger().log(self.output.getvalue())
 
         result.set(value)
 
-    def _run_test_logfile(self, opts, result):
+    def _run_test_logfile(self, result):
         """ Run a specific test, obtaining results from a logfile """
 
-        logpath = os.path.join(opts.logfile_dir,
-                               opts.logfile_pattern.replace("%s", str(self)))
+        Logger().log("Using logfile '%s'" % (self.logpath, ))
 
-        if not opts.quiet:
-            print "Using logfile '%s'" % (logpath, )
-
-        fd = os.open(logpath, os.O_CREAT | os.O_RDONLY, 0644)
+        fd = os.open(self.logpath, os.O_CREAT | os.O_RDONLY, 0644)
         logfile = os.fdopen(fd)
         logfile.seek(0, os.SEEK_END)
 
-        domu = XLDomU(self.cfg_path())
-        domu.create()
-
-        if not self._notify_domain_create():
-            domu.cleanup(0)
-            result.set(TestResult.ERROR)
-            return
-
-        domu.unpause()
+        self.domu.unpause()
 
         # wait for completion
-        domu.cleanup()
+        if not self.domu.cleanup():
+            result.set(TestResult.CRASH)
 
         line = ""
         for line in logfile.readlines():
-
             line = line.rstrip()
-            if not opts.quiet:
-                print line
+            Logger().log(line)
 
             if "Test result:" in line:
                 print ""
@@ -187,9 +169,9 @@ class DomuTestInfo(TestInfo):
         if variations:
             for env in envs:
                 for vary in variations:
-                    res.append(self.instance_class(env, self.name, vary, self))
+                    res.append(self.instance_class(env, self.name, vary))
         else:
-            res = [ self.instance_class(env, self.name, None, self)
+            res = [ self.instance_class(env, self.name, None)
                     for env in envs ]
         return res
 

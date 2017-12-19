@@ -114,6 +114,8 @@ static int emul_unimpl_setup(int argc, char *argv[])
         return -EINVAL;
     }
 
+    pmon->mon.log_lvl = XTF_MON_LEVEL_TRACE;
+
     add_evtchn(&evtchn_instance, pmon->domain_id);
 
     return 0;
@@ -194,13 +196,6 @@ static int emul_unimpl_run()
 
     if ( !pmon )
         return -EINVAL;
-
-    rc = xc_domain_unpause(xtf_xch, pmon->domain_id);
-    if ( rc < 0 )
-    {
-        XTF_MON_ERROR("Error unpausing domain.\n");
-        return rc;
-    }
 
     return xtf_evtchn_loop(pmon->domain_id);
 }

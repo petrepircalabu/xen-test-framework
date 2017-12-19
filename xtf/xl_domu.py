@@ -21,10 +21,11 @@ from   xtf.logger import Logger
 # Functions
 ########################################################################
 
-def _run_cmd(args):
+def _run_cmd(args, quiet=False):
     """Execute command using Popen"""
     proc = Popen(args, stdout = PIPE, stderr = PIPE)
-    Logger().log("Executing '%s'" % (" ".join(args), ))
+    if not quiet:
+        Logger().log("Executing '%s'" % (" ".join(args), ))
     _, stderr = proc.communicate()
     return proc.returncode, _, stderr
 
@@ -64,9 +65,9 @@ def _xl_unpause(domid):
 
 def _is_alive(domid):
     """Checks if the domain is alive using xenstore."""
-    args = ['xenstore-exists', os.path.join("/local/domain/", str(domid))]
-    ret = _run_cmd(args)[0]
-    return ret != 0
+    args = ['xenstore-exists', os.path.join('/local/domain', str(domid))]
+    ret = _run_cmd(args, True)[0]
+    return ret == 0
 
 
 ########################################################################
@@ -94,16 +95,19 @@ class XLDomU(object):
         """Destroys the domain."""
 
         if self.dom_id == 0:
-            return
+            return True
 
         for _ in xrange(timeout):
             if not _is_alive(self.dom_id):
-                return
+                return True
             time.sleep(1)
 
         if _is_alive(self.dom_id):
             _xl_destroy(self.dom_id)
             self.dom_id = 0
+            return False
+
+        return True
 
     def unpause(self):
         """Unpauses the domain."""

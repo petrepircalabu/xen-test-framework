@@ -7,7 +7,8 @@ xtf-runner - A utility for enumerating and running XTF tests.
 Currently assumes the presence and availability of the `xl` toolstack.
 """
 
-import sys, os, os.path as path
+import os
+import sys
 
 from optparse import OptionParser
 from subprocess import Popen, PIPE
@@ -270,7 +271,7 @@ def run_tests(opts):
     """ Run tests """
 
     tests = opts.selection
-    if not len(tests):
+    if not tests:
         raise RunnerError("No tests to run")
 
     rc = TestResult()
@@ -278,7 +279,10 @@ def run_tests(opts):
 
     for test in tests:
         res = TestResult()
-        test.run(opts, res)
+        test.set_up(opts, res)
+        if res == TestResult.SUCCESS:
+            test.run(res)
+        test.clean_up(res)
 
         if res > rc:
             rc = res
@@ -300,7 +304,7 @@ def main():
     sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
 
     # Normalise $CWD to the directory this script is in
-    os.chdir(path.dirname(path.abspath(sys.argv[0])))
+    os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
     # Avoid wrapping the epilog text
     OptionParser.format_epilog = lambda self, formatter: self.epilog
@@ -442,8 +446,8 @@ def main():
 
     if opts.list_tests:
         return list_tests(opts)
-    else:
-        return run_tests(opts)
+
+    return run_tests(opts)
 
 
 if __name__ == "__main__":

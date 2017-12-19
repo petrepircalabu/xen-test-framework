@@ -82,7 +82,8 @@ class TestInstance(object):
     @staticmethod
     def result_pattern():
         """the test result pattern."""
-        return ['Test result: ' + x for x in TestResult.all_results] + [pexpect.TIMEOUT, pexpect.EOF]
+        return ['Test result: ' + x for x in TestResult.all_results] + \
+               [pexpect.TIMEOUT, pexpect.EOF]
 
     def __init__(self, name):
         self.name = name
@@ -93,8 +94,16 @@ class TestInstance(object):
     def __cmp__(self, other):
         return cmp(repr(self), repr(other))
 
-    def run(self, opts, result):
+    def set_up(self, opts, result):
+        """Sets up the necessary resources needed to run the test."""
+        raise NotImplementedError
+
+    def run(self, result):
         """Runs the Test Instance."""
+        raise NotImplementedError
+
+    def clean_up(self, result):
+        """Cleans up the test data."""
         raise NotImplementedError
 
 
