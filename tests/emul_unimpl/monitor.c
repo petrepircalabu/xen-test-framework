@@ -11,6 +11,14 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+typedef enum
+{
+    INIT,
+    MEM_ACCESS,
+    SINGLESTEP,
+    EMUL_UNIMPL
+} emul_unimpl_state_t;
+
 typedef struct emul_unimpl_monitor
 {
     xtf_monitor_t mon;
@@ -18,6 +26,7 @@ typedef struct emul_unimpl_monitor
     uint64_t address;
     uint16_t altp2m_view_id;
     unsigned long gfn;
+    emul_unimpl_state_t state;
 } emul_unimpl_monitor_t;
 
 const char monitor_test_help[] = \
@@ -29,6 +38,7 @@ static int emul_unimpl_setup(int argc, char *argv[]);
 static int emul_unimpl_init();
 static int emul_unimpl_run();
 static int emul_unimpl_cleanup();
+static int emul_unimpl_get_result();
 
 static emul_unimpl_monitor_t monitor_instance =
 {
@@ -38,6 +48,7 @@ static emul_unimpl_monitor_t monitor_instance =
         .init       = emul_unimpl_init,
         .run        = emul_unimpl_run,
         .cleanup    = emul_unimpl_cleanup,
+        .get_result = emul_unimpl_get_result,
     }
 };
 
@@ -114,7 +125,7 @@ static int emul_unimpl_setup(int argc, char *argv[])
         return -EINVAL;
     }
 
-    pmon->mon.log_lvl = XTF_MON_LEVEL_TRACE;
+    pmon->state = INIT;
 
     add_evtchn(&evtchn_instance, pmon->domain_id);
 
@@ -220,6 +231,16 @@ static int emul_unimpl_cleanup()
     return 0;
 }
 
+static int emul_unimpl_get_result()
+{
+    emul_unimpl_monitor_t *pmon = (emul_unimpl_monitor_t *)monitor;
+
+    if ( !pmon )
+        return XTF_MON_ERROR;
+
+    return (pmon->state == EMUL_UNIMPL) ? XTF_MON_SUCCESS : XTF_MON_FAILURE;
+
+}
 
 static int emul_unimpl_mem_access(domid_t domain_id, vm_event_request_t *req, vm_event_response_t *rsp)
 {
@@ -231,6 +252,9 @@ static int emul_unimpl_mem_access(domid_t domain_id, vm_event_request_t *req, vm
         return -EINVAL;
 
     rsp->flags |= VM_EVENT_FLAG_EMULATE | VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
+
+    if ( pmon->state == INIT )
+        pmon->state = MEM_ACCESS;
 
     return 0;
 }
@@ -249,6 +273,9 @@ static int emul_unimpl_singlestep(domid_t domain_id, vm_event_request_t *req, vm
     xc_altp2m_set_mem_access(xtf_xch, pmon->domain_id, pmon->altp2m_view_id,
         pmon->gfn, XENMEM_access_rwx);
 
+    if ( pmon->state == EMUL_UNIMPL )
+        pmon->state = SINGLESTEP;
+
     return 0;
 }
 
@@ -263,6 +290,9 @@ static int emul_unimpl_emul_unimpl(domid_t domain_id, vm_event_request_t *req, v
 
     rsp->flags |= VM_EVENT_FLAG_ALTERNATE_P2M ;
     rsp->altp2m_idx = 0;
+
+    if (pmon->state == MEM_ACCESS )
+        pmon->state = EMUL_UNIMPL;
 
     return 0;
 }

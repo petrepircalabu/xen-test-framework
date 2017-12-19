@@ -21,6 +21,15 @@ typedef enum
     XTF_MON_LEVEL_TRACE,
 } xtf_mon_log_level_t;
 
+/* Should be in sync with "test_status" from common/report.c */
+typedef enum {
+    XTF_MON_RUNNING, /**< Test not yet completed.       */
+    XTF_MON_SUCCESS, /**< Test was successful.          */
+    XTF_MON_SKIP,    /**< Test cannot be completed.     */
+    XTF_MON_ERROR,   /**< Issue with the test itself.   */
+    XTF_MON_FAILURE, /**< Issue with the tested matter. */
+} xtf_mon_status_t;
+
 void xtf_log(xtf_mon_log_level_t lvl, const char *fmt, ...) __attribute__((__format__(__printf__, 2, 3)));
 
 #define XTF_MON_FATAL(format...)    xtf_log(XTF_MON_LEVEL_FATAL,    format)
@@ -59,10 +68,12 @@ typedef struct xtf_monitor
     struct xs_handle *xsh;                  /**< XEN store handle */
     xtf_evtchn_t *evt;                      /**< Event channel list */
     xtf_mon_log_level_t log_lvl;            /**< Log Level */
+    xtf_mon_status_t status;                /**< Test Status */
     int (*setup)(int, char*[]);             /**< Test specific setup */
     int (*init)(void);                      /**< Test specific initialization */
     int (*run)(void);                       /**< Test specific routine */
     int (*cleanup)(void);                   /**< Test specific cleanup */
+    int (*get_result)(void);                /**< Returns the test's result */
 } xtf_monitor_t;
 
 xtf_monitor_t *get_monitor();
@@ -75,6 +86,7 @@ xtf_monitor_t *get_monitor();
 #define xtf_monitor_init()              ( call_helper(monitor->init) )
 #define xtf_monitor_run()               ( call_helper(monitor->run) )
 #define xtf_monitor_cleanup()           ( call_helper(monitor->cleanup) )
+#define xtf_monitor_get_result()        ( call_helper(monitor->get_result) )
 
 int xtf_evtchn_init(domid_t domain_id);
 int xtf_evtchn_cleanup(domid_t domain_id);

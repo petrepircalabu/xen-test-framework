@@ -33,6 +33,23 @@ void xtf_log(xtf_mon_log_level_t lvl, const char *fmt, ...)
     }
 }
 
+static void xtf_print_status(xtf_mon_status_t status)
+{
+    const char *xtf_mon_status_name[] =
+    {
+        "RUNNING",
+        "SUCCESS",
+        "SKIP",
+        "ERROR",
+        "FAILURE"
+    };
+
+    if ( status > XTF_MON_RUNNING && status <= XTF_MON_FAILURE )
+    {
+        printf("Test result: %s\n", xtf_mon_status_name[status]);
+    }
+}
+
 void usage()
 {
     fprintf(stderr, "%s", monitor_test_help);
@@ -309,25 +326,32 @@ int main(int argc, char* argv[])
 {
     int rc;
 
+    monitor->status = XTF_MON_RUNNING;
+    monitor->log_lvl = XTF_MON_LEVEL_ERROR;
+
     /* test specific setup sequence */
     rc = xtf_monitor_setup(argc, argv);
     if ( rc )
-        return rc;
+    {
+        monitor->status = XTF_MON_ERROR;
+        goto e_exit;
+    }
 
     monitor->xch = xc_interface_open(NULL, NULL, 0);
     if ( !monitor->xch )
     {
         XTF_MON_FATAL("Error initialising xenaccess\n");
-        return -1;
+        rc = -EINVAL;
+        monitor->status = XTF_MON_ERROR;
+        goto e_exit;
     }
-
-    monitor->log_lvl = XTF_MON_LEVEL_ERROR;
 
     monitor->xsh = xs_open(XS_OPEN_READONLY);
     if ( !monitor->xsh )
     {
         XTF_MON_FATAL("Error opening XEN store\n");
         rc = -EINVAL;
+        monitor->status = XTF_MON_ERROR;
         goto cleanup;
     }
 
@@ -335,20 +359,27 @@ int main(int argc, char* argv[])
     {
         XTF_MON_FATAL("Error monitoring releaseDomain\n");
         rc = -EINVAL;
+        monitor->status = XTF_MON_ERROR;
         goto cleanup;
     }
 
     /* test specific initialization sequence */
     rc = xtf_monitor_init();
     if ( rc )
+    {
+        monitor->status = XTF_MON_ERROR;
         goto cleanup;
+    }
 
     /* Run test */
     rc = xtf_monitor_run();
     if ( rc )
     {
         XTF_MON_ERROR("Error running test\n");
+        monitor->status = XTF_MON_ERROR;
     }
+
+    monitor->status = xtf_monitor_get_result();
 
 cleanup:
     /* test specific cleanup sequence */
@@ -362,6 +393,8 @@ cleanup:
 
     xc_interface_close(monitor->xch);
 
+e_exit:
+    xtf_print_status(monitor->status);
     return rc;
 }
 
