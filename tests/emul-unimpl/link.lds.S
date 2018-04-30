@@ -56,6 +56,12 @@ SECTIONS
         . = ALIGN(PAGE_SIZE);
                 *(.data.page_aligned)
         . = ALIGN(PAGE_SIZE);
+
+        __start_user_data = .;
+                *(.data.user)
+	. = ALIGN(PAGE_SIZE);
+        __end_user_data = .;
+
         }
 
         .rodata : {
