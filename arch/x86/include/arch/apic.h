@@ -18,6 +18,10 @@
 /* Local APIC register definitions. */
 #define APIC_ID         0x020
 #define APIC_LVR        0x030
+#define APIC_TASKPRI	0x80
+#define	  APIC_TPRI_MASK          0x000FFu
+#define APIC_EOI	0xB0
+#define   APIC_EOI_ACK		  0x00000
 #define APIC_SPIV       0x0f0
 #define   APIC_SPIV_APIC_ENABLED  0x00100
 
@@ -27,6 +31,16 @@
 #define   APIC_DEST_SELF          0x40000
 
 #define APIC_ICR2       0x310
+
+#define APIC_LVTT	0x320
+#define APIC_LVTTHMR	0x330
+#define APIC_LVTPC	0x340
+#define APIC_LVT0	0x350
+#define	APIC_LVT1	0x360
+#define	APIC_LVTERR	0x370
+#define	APIC_TMICT	0x380
+#define	APIC_TMCCT	0x390
+#define	APIC_TDCR	0x3E0
 
 #define APIC_DEFAULT_BASE 0xfee00000ul
 
