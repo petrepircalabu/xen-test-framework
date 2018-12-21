@@ -148,4 +148,5 @@ enable BTS.
 
 
 @section index-monitor Monitor
+@subpage test-monitor-mem-access - memory access monitor test
 */
